@@ -1,7 +1,11 @@
 # Location Sample Project
+<br/>
 
-위치 기반 메시지 및 위치 추적을 위한 풀스택 샘플 프로젝트입니다.  
-**Backend**(Kotlin/Spring Boot), **Web**(Vue 3/Vite), **Mobile**(Expo/React Native) 세 부분으로 구성되며, 도메인·애플리케이션·인프라를 분리한 구조로 설계되어 있습니다.
+<img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/7c3533f3-47f0-4072-9054-5c35fb4550de" />
+
+<br/>
+위치 기반 메시지 및 위치 추적을 위한 풀스택 샘플 프로젝트입니다.  <br/>
+**Backend**(Kotlin/Spring Boot), **Web**(Vue 3/Vite), **Mobile**(Expo/React Native) 세 부분으로 구성되며, 도메인·애플리케이션·인프라를 분리한 구조로 설계되어 있습니다.<br/>
 
 ---
 
@@ -149,7 +153,7 @@ flowchart TB
 
 ---
 
-### 3.2 Backend 레이어 (클린 아키텍처)
+### 3.2 Backend 레이어 
 
 ```mermaid
 flowchart LR
@@ -305,13 +309,3 @@ erDiagram
 
 ---
 
-## 문서·실행 상세
-
-| 항목 | 경로 |
-|------|------|
-| 전체 연동·실행 방법 | [docs/README.md](docs/README.md) |
-| Backend 상세 | [docs/location-app/backend/README.md](docs/location-app/backend/README.md) |
-| Frontend 상세 | [docs/location-app/frontend/README.md](docs/location-app/frontend/README.md) |
-| Mobile 상세 | [docs/location-mobile/README.md](docs/location-mobile/README.md) |
-
-이 README는 기능·사용 방법, 패키지 구조, 아키텍처(UML), ERD, 설계 이유를 한곳에서 보기 위한 요약입니다.
