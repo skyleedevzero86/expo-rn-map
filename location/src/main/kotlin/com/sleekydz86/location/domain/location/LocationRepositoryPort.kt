@@ -1,4 +1,4 @@
-package com.sleekydz86.location.application.location
+package com.sleekydz86.location.domain.location
 
 interface LocationRepositoryPort {
 
