@@ -75,5 +75,5 @@ insert into message (sender, message, send_date, status) values
                                                              ('user_008', '예약 확인했습니다.', date_sub(now(), interval 1 hour), 1),
                                                              ('user_009', '늦을 것 같아요.', date_sub(now(), interval 2 hour), 1),
                                                              ('user_010', '여기서 만나요.', date_sub(now(), interval 3 hour), 1),
-                                                             ('user_011', '메시지 전송 실패 테스트', date_sub(now(), interval 5 minute), 2),
+                                                             ('user_011', '메시지 전송 실패 테스트', date_sub(now(), interval 5 minute), 0),
                                                              ('user_012', '대기 중인 메시지', date_sub(now(), interval 1 minute), 0);
