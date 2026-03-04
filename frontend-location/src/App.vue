@@ -50,9 +50,20 @@ function getKakao() {
   return typeof window !== 'undefined' ? window.kakao : undefined
 }
 
-function overlayContent(title: string, uploadDate: string, lat: number, lng: number) {
-  const escapedTitle = title.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const escapedDate = uploadDate.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+function overlayContent(
+  title: string,
+  uploadDate: string,
+  lat: number,
+  lng: number,
+  bodySecondLine?: string
+) {
+  const escape = (s: string) => s.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const escapedTitle = escape(title)
+  const escapedDate = escape(uploadDate)
+  const secondLine =
+    bodySecondLine != null && bodySecondLine !== ''
+      ? escape(bodySecondLine)
+      : `위도 ${lat.toFixed(5)}, 경도 ${lng.toFixed(5)}`
   return (
     '<div class="kakao-overlay wrap">' +
     '  <div class="info">' +
@@ -63,7 +74,7 @@ function overlayContent(title: string, uploadDate: string, lat: number, lng: num
     '    <div class="body">' +
     '      <div class="desc">' +
     `        <div class="ellipsis">갱신 시각: ${escapedDate}</div>` +
-    `        <div class="jibun ellipsis">위도 ${lat.toFixed(5)}, 경도 ${lng.toFixed(5)}</div>` +
+    `        <div class="jibun ellipsis">${secondLine}</div>` +
     '      </div>' +
     '    </div>' +
     '  </div>' +
@@ -106,7 +117,14 @@ function createSpriteMarkerImage(
 }
 
 function drawKakaoMap(
-  positions: { title: string; lat: number; lng: number; uploadDate: string; isMyLocation?: boolean }[],
+  positions: {
+    title: string
+    lat: number
+    lng: number
+    uploadDate: string
+    isMyLocation?: boolean
+    bodySecondLine?: string
+  }[],
   currentLocation?: { latitude: number; longitude: number; uploadDate: string } | null
 ) {
   const kakao = getKakao()
@@ -156,7 +174,13 @@ function drawKakaoMap(
     ;(marker as unknown as { normalImage?: unknown }).normalImage = image
     markersRef.value.push(marker)
 
-    const content = overlayContent(pos.title, pos.uploadDate, pos.lat, pos.lng)
+    const content = overlayContent(
+      pos.title,
+      pos.uploadDate,
+      pos.lat,
+      pos.lng,
+      pos.bodySecondLine
+    )
     const overlay = new CustomOverlay({
       content,
       map: null,
@@ -189,63 +213,82 @@ async function loadLocationsAndDrawMap() {
 
   locationsLoading.value = true
   locationsLoadError.value = null
-  let positions: { title: string; lat: number; lng: number; uploadDate: string; isMyLocation: boolean }[] =
-    []
+  let positions: {
+    title: string
+    lat: number
+    lng: number
+    uploadDate: string
+    isMyLocation: boolean
+    bodySecondLine?: string
+  }[] = []
   try {
     const res = await locationUseCases.getLocations(500)
     const raw = res?.locations
     const list = Array.isArray(raw) ? raw : []
     locationsList.value = list
+    const toLat = (loc: { latitude?: number; lat?: number }) => Number(loc.latitude ?? (loc as { lat?: number }).lat)
+    const toLng = (loc: { longitude?: number; lng?: number }) => Number(loc.longitude ?? (loc as { lng?: number }).lng)
+    console.log('[지도 마커] API 응답:', res)
+    console.log('[지도 마커] DB에서 받은 location 개수:', list.length)
+    if (list.length > 0) {
+      console.log(
+        '[지도 마커] DB location (no, sender, message):',
+        list.map((loc) => ({ no: loc.no, sender: loc.sender, message: loc.message }))
+      )
+    }
 
     if (list.length === 0) {
       locationsLoadError.value =
         'DB에 location이 없습니다. MySQL에서 location/src/main/resources/script.sql 의 location INSERT를 실행한 뒤 "지도 마커 새로고침"을 누르세요.'
     }
 
-    positions = list.map((loc) => ({
-      title: `위치 #${loc.no} · ${formatDateTime(loc.uploadDate)}`,
-      lat: Number(loc.latitude),
-      lng: Number(loc.longitude),
-      uploadDate: formatDateTime(loc.uploadDate),
-      isMyLocation: false,
-    }))
+    positions = list.map((loc) => {
+      
+      const messageText =
+        (loc as { message?: string; content?: string }).message ??
+        (loc as { message?: string; content?: string }).content ??
+        ''
+      const senderText = loc.sender ?? ''
+      const hasAuthorMessage = senderText !== '' || messageText !== ''
+      const title = hasAuthorMessage
+        ? `작성자 ${senderText || '(알 수 없음)'} : ${messageText.length > 40 ? messageText.slice(0, 40) + '…' : messageText || '(메시지 없음)'}`
+        : `위치 #${loc.no} · ${formatDateTime(loc.uploadDate)}`
+      return {
+        title,
+        lat: toLat(loc),
+        lng: toLng(loc),
+        uploadDate: formatDateTime(loc.uploadDate),
+        isMyLocation: false,
+        bodySecondLine: messageText !== '' ? messageText : undefined,
+      }
+    })
 
-    if (positions.length === 0 && location.value) {
-      positions.push({
-        title: '내 위치',
-        lat: location.value.latitude,
-        lng: location.value.longitude,
-        uploadDate: formatDateTime(location.value.uploadDate),
-        isMyLocation: true,
-      })
+    const myLat = location.value?.latitude
+    const myLng = location.value?.longitude
+    const isSameCoord = (p: { lat: number; lng: number }) =>
+      myLat != null && myLng != null &&
+      Math.abs(p.lat - myLat) < 1e-5 && Math.abs(p.lng - myLng) < 1e-5
+    if (myLat != null && myLng != null) {
+      positions = positions.filter((p) => !isSameCoord(p))
+      positions = [
+        {
+          title: '내 위치',
+          lat: myLat,
+          lng: myLng,
+          uploadDate: location.value ? formatDateTime(location.value.uploadDate) : '',
+          isMyLocation: true,
+        },
+        ...positions,
+      ]
+    } else if (positions.length === 0) {
+      positions = []
     }
   } catch (e) {
     locationsLoadError.value = e instanceof Error ? e.message : '위치 목록을 불러올 수 없습니다.'
   }
 
   try {
-    if (location.value) {
-      const hasCurrent =
-        positions.some(
-          (p) =>
-            Math.abs(p.lat - location.value!.latitude) < 1e-5 &&
-            Math.abs(p.lng - location.value!.longitude) < 1e-5
-        )
-      if (!hasCurrent) {
-        positions = [
-          {
-            title: '내 위치',
-            lat: location.value.latitude,
-            lng: location.value.longitude,
-            uploadDate: formatDateTime(location.value.uploadDate),
-            isMyLocation: true,
-          },
-          ...positions,
-        ]
-      }
-    } else if (positions.length === 0) {
-      positions = []
-    }
+    console.log('[지도 마커] 그릴 마커 개수:', positions.length, positions)
     drawKakaoMap(positions, location.value ?? undefined)
   } catch (e) {
     locationsLoadError.value = e instanceof Error ? e.message : '지도를 그리는 중 오류가 발생했습니다.'

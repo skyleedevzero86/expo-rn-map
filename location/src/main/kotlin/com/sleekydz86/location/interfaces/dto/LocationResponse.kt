@@ -6,5 +6,7 @@ data class LocationResponse(
     val no: Long,
     val latitude: Double,
     val longitude: Double,
-    val uploadDate: Instant
+    val uploadDate: Instant,
+    val sender: String? = null,
+    val message: String? = null
 )

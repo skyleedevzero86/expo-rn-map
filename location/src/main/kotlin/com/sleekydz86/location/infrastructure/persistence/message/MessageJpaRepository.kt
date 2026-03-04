@@ -13,6 +13,8 @@ interface MessageJpaRepository : JpaRepository<MessageJpaEntity, Long> {
 
     fun findByStatusOrderByNoDesc(status: MessageStatus): List<MessageJpaEntity>
 
+    fun findByLocationNoInOrderBySendDateDesc(locationIds: List<Long>): List<MessageJpaEntity>
+
     @Modifying
     @Query("UPDATE MessageJpaEntity m SET m.status = :readStatus WHERE m.status = :unreadStatus")
     fun markAllUnreadAsRead(

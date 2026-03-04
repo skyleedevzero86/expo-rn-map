@@ -7,12 +7,14 @@ import org.springframework.context.annotation.Primary
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import org.slf4j.LoggerFactory
 
 @Component
 @Primary
 class MessageRepositoryAdapter(
     private val jpaRepository: MessageJpaRepository
 ) : MessageRepositoryPort {
+    private val log = LoggerFactory.getLogger(javaClass)
 
     override fun countAll(): Long = jpaRepository.count()
 
@@ -40,6 +42,19 @@ class MessageRepositoryAdapter(
             jpaRepository.flush()
         }
         return unread.map { it.toDomain() }
+    }
+
+    override fun findLatestByLocationIds(locationIds: List<Long>): Map<Long, Message> {
+        if (locationIds.isEmpty()) return emptyMap()
+        val list = jpaRepository.findByLocationNoInOrderBySendDateDesc(locationIds.distinct())
+        val map = list
+            .filter { it.locationNo != null }
+            .distinctBy { it.locationNo!! }
+            .associate { it.locationNo!! to it.toDomain() }
+        if (list.isEmpty() && locationIds.isNotEmpty()) {
+            log.warn("[findLatestByLocationIds] message 테이블에 행이 없습니다. script.sql 의 message INSERT 를 실행하세요.")
+        }
+        return map
     }
 }
 

@@ -3,6 +3,8 @@ export interface LocationResponse {
   latitude: number
   longitude: number
   uploadDate: string
+  sender?: string | null
+  message?: string | null
 }
 
 export interface LocationsResponse {

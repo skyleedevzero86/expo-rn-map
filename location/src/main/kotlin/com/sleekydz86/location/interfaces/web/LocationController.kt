@@ -1,7 +1,7 @@
 package com.sleekydz86.location.interfaces.web
 
 import com.sleekydz86.location.application.location.GetCurrentLocationUseCase
-import com.sleekydz86.location.application.location.GetLocationsUseCase
+import com.sleekydz86.location.application.location.GetLocationsWithMessagesUseCase
 import com.sleekydz86.location.application.location.UpdateLocationUseCase
 import com.sleekydz86.location.application.message.GetUnreadMessagesUseCase
 import com.sleekydz86.location.interfaces.dto.LocationResponse
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api")
 class LocationController(
     private val getCurrentLocationUseCase: GetCurrentLocationUseCase,
-    private val getLocationsUseCase: GetLocationsUseCase,
+    private val getLocationsWithMessagesUseCase: GetLocationsWithMessagesUseCase,
     private val updateLocationUseCase: UpdateLocationUseCase,
     private val getUnreadMessagesUseCase: GetUnreadMessagesUseCase
 ) {
@@ -47,12 +47,14 @@ class LocationController(
     @GetMapping("/locations")
     fun getLocations(@RequestParam(defaultValue = "100") limit: Int): ResponseEntity<LocationsResponse> {
         val safeLimit = limit.coerceIn(1, 500)
-        val list = getLocationsUseCase.execute(safeLimit).map { loc ->
+        val list = getLocationsWithMessagesUseCase.execute(safeLimit).map { loc ->
             LocationResponse(
                 no = loc.id,
                 latitude = loc.coordinates.latitude,
                 longitude = loc.coordinates.longitude,
-                uploadDate = loc.uploadedAt
+                uploadDate = loc.uploadedAt,
+                sender = loc.sender,
+                message = loc.message
             )
         }
         return ResponseEntity.ok(LocationsResponse(locations = list))

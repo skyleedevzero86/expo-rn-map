@@ -72,7 +72,10 @@ export function createHttpBackendApi(): IBackendApi {
     },
 
     getLocations(limit = 100): Promise<LocationsResponse> {
-      return request<LocationsResponse>(`/locations?limit=${Math.min(500, Math.max(1, limit))}`)
+      return request<LocationsResponse>(
+        `/locations?limit=${Math.min(500, Math.max(1, limit))}`,
+        { cache: 'no-store', headers: { Pragma: 'no-cache', 'Cache-Control': 'no-cache' } }
+      )
     },
 
     postLocationAndGetMessages(latitude: number, longitude: number): Promise<MessagesResponse> {
