@@ -6,6 +6,8 @@ import com.sleekydz86.location.application.location.UpdateLocationUseCase
 import com.sleekydz86.location.application.message.GetUnreadMessagesUseCase
 import com.sleekydz86.location.interfaces.dto.LocationResponse
 import com.sleekydz86.location.interfaces.dto.LocationsResponse
+import com.sleekydz86.location.interfaces.dto.MessageResponse
+import com.sleekydz86.location.interfaces.dto.MessagesResponse
 import com.sleekydz86.location.interfaces.dto.PostLocationRequest
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
