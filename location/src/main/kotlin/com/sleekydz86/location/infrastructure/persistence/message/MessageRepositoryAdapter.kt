@@ -25,7 +25,8 @@ class MessageRepositoryAdapter(
             sender = message.sender,
             content = message.content,
             sendDate = message.sentAt,
-            status = message.status
+            status = message.status,
+            locationNo = message.locationId
         )
         val saved = jpaRepository.save(entity)
         return saved.toDomain()
@@ -47,5 +48,6 @@ private fun MessageJpaEntity.toDomain(): Message = Message(
     sender = sender,
     content = content,
     sentAt = sendDate,
-    status = status
+    status = status,
+    locationId = locationNo
 )

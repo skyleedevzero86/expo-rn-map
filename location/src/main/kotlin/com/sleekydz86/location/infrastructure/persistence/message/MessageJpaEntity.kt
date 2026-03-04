@@ -29,7 +29,10 @@ class MessageJpaEntity(
 
     @Column(nullable = false)
     @Enumerated(EnumType.ORDINAL)
-    var status: MessageStatus = MessageStatus.UNREAD
+    var status: MessageStatus = MessageStatus.UNREAD,
+
+    @Column(name = "location_no")
+    var locationNo: Long? = null
 ) {
     companion object {
         private const val READ_ORDINAL = 1

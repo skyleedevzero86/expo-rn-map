@@ -7,5 +7,6 @@ data class Message(
     val sender: String,
     val content: String,
     val sentAt: Instant,
-    val status: MessageStatus
+    val status: MessageStatus,
+    val locationId: Long? = null
 )
