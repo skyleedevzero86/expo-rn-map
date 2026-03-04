@@ -18,11 +18,17 @@ function getApiBase(): string {
 
 const BASE = getApiBase()
 
-function parseErrorBody(body: unknown): string {
+const BACKEND_UNREACHABLE_MSG =
+  '백엔드 서버에 연결할 수 없습니다. location 폴더에서 gradlew bootRun (Windows: gradlew.bat bootRun)으로 서버를 실행해 주세요.'
+
+function parseErrorBody(body: unknown, status: number): string {
   if (body != null && typeof body === 'object' && 'details' in body) {
     const d = (body as { details?: unknown }).details
     if (typeof d === 'string') return d
     if (d != null && typeof d === 'object') return JSON.stringify(d)
+  }
+  if (status === 500 || status === 502 || status === 503) {
+    return BACKEND_UNREACHABLE_MSG
   }
   return '요청에 실패했습니다.'
 }
@@ -48,7 +54,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.status === 204) return undefined as T
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(parseErrorBody(err))
+    throw new Error(parseErrorBody(err, res.status))
   }
   try {
     return await res.json()

@@ -1,10 +1,16 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useLocation } from '@/presentation/hooks/useLocation'
 import { useMessages } from '@/presentation/hooks/useMessages'
 import { locationUseCases } from '@/composition'
 import { formatDateTime } from '@/presentation/utils/format'
 import type { MessageItem, LocationResponse } from '@/domain/types'
+
+const BACKEND_UNREACHABLE_MSG =
+  '백엔드 서버에 연결할 수 없습니다. location 폴더에서 gradlew bootRun (Windows: gradlew.bat bootRun)으로 서버를 실행해 주세요.'
+
+const isBackendUnreachable = (msg: string | null) =>
+  msg != null && msg.trim() === BACKEND_UNREACHABLE_MSG.trim()
 
 const mapContainer = ref<HTMLDivElement | null>(null)
 const { location, loading: locationLoading, error: locationError, fetchLocation, updateLocation } = useLocation()
@@ -26,6 +32,13 @@ const locationsList = ref<LocationResponse[]>([])
 const locationsLoading = ref(false)
 const locationsLoadError = ref<string | null>(null)
 const kakaoMapKey = ref(import.meta.env.VITE_KAKAO_MAP_KEY ?? '')
+
+const showBackendUnreachableBanner = computed(
+  () =>
+    isBackendUnreachable(locationError.value) ||
+    isBackendUnreachable(messagesError.value) ||
+    isBackendUnreachable(locationsLoadError.value)
+)
 
 let mapInstance: ReturnType<Window['kakao']['maps']['Map']> | null = null
 const markersRef = ref<ReturnType<Window['kakao']['maps']['Marker']>[]>([])
@@ -65,38 +78,82 @@ function closeOverlay() {
   }
 }
 
-function drawKakaoMap(positions: { title: string; lat: number; lng: number; uploadDate: string }[]) {
+const SPRITE_MARKER_URL =
+  'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markers_sprites2.png'
+const MARKER_W = 33
+const MARKER_H = 36
+const SPRITE_GAP = 10
+const SPRITE_W = 126
+const SPRITE_H = 146
+
+function createSpriteMarkerImage(
+  kakao: { maps: { Size: (w: number, h: number) => unknown; Point: (x: number, y: number) => unknown; MarkerImage: new (url: string, size: unknown, opts?: unknown) => unknown } },
+  rowIndex: number
+) {
+  const Size = kakao.maps.Size
+  const Point = kakao.maps.Point
+  const MarkerImage = kakao.maps.MarkerImage
+  const markerSize = new Size(MARKER_W, MARKER_H)
+  const offset = new Point(12, MARKER_H)
+  const originY = (MARKER_H + SPRITE_GAP) * rowIndex
+  const spriteOrigin = new Point(0, originY)
+  const spriteSize = new Size(SPRITE_W, SPRITE_H)
+  return new MarkerImage(SPRITE_MARKER_URL, markerSize, {
+    offset,
+    spriteOrigin,
+    spriteSize,
+  })
+}
+
+function drawKakaoMap(
+  positions: { title: string; lat: number; lng: number; uploadDate: string; isMyLocation?: boolean }[],
+  currentLocation?: { latitude: number; longitude: number; uploadDate: string } | null
+) {
   const kakao = getKakao()
   if (!mapContainer.value || !kakao?.maps) return
 
-  const { Map, LatLng, Marker, MarkerImage, Size, CustomOverlay, event } = kakao.maps
+  const { Map, LatLng, Marker, Size, CustomOverlay, event } = kakao.maps
+  const kakaoMaps = kakao.maps as Record<string, unknown>
+  const ZoomControlClass = kakaoMaps.ZoomControl as new () => { setMap?: (m: unknown) => void }
+  const ControlPosition = kakaoMaps.ControlPosition as { RIGHT: unknown }
+
+  const centerForMap =
+    currentLocation != null
+      ? new LatLng(currentLocation.latitude, currentLocation.longitude)
+      : positions.length > 0
+        ? new LatLng(positions[0].lat, positions[0].lng)
+        : new LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng)
 
   if (!mapInstance) {
-    const center = positions.length
-      ? new LatLng(positions[0].lat, positions[0].lng)
-      : new LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng)
     mapInstance = new Map(mapContainer.value, {
-      center,
+      center: centerForMap,
       level: 14,
     })
+    if (ZoomControlClass && ControlPosition?.RIGHT) {
+      const zoomControl = new ZoomControlClass()
+      mapInstance.addControl(zoomControl, ControlPosition.RIGHT)
+    }
   }
+  mapInstance.setZoomable(true)
+  mapInstance.setDraggable(true)
 
   markersRef.value.forEach((m) => m.setMap(null))
   markersRef.value = []
   closeOverlay()
 
-  const imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png'
-  const imageSize = new Size(24, 35)
-  const markerImage = new MarkerImage(imageSrc, imageSize)
+  const myMarkerImage = createSpriteMarkerImage(kakao, 0)
+  const dbMarkerImage = createSpriteMarkerImage(kakao, 1)
 
-  positions.forEach((pos, i) => {
+  positions.forEach((pos) => {
     const latlng = new LatLng(pos.lat, pos.lng)
+    const image = pos.isMyLocation ? myMarkerImage : dbMarkerImage
     const marker = new Marker({
       map: mapInstance,
       position: latlng,
       title: pos.title,
-      image: markerImage,
+      image,
     })
+    ;(marker as unknown as { normalImage?: unknown }).normalImage = image
     markersRef.value.push(marker)
 
     const content = overlayContent(pos.title, pos.uploadDate, pos.lat, pos.lng)
@@ -117,27 +174,40 @@ function drawKakaoMap(positions: { title: string; lat: number; lng: number; uplo
     ;(window as unknown as { __closeKakaoOverlay?: () => void }).__closeKakaoOverlay = closeOverlay
   }
 
-  if (positions.length > 0) {
-    mapInstance.setCenter(new LatLng(positions[0].lat, positions[0].lng))
-  }
+  mapInstance.setCenter(centerForMap)
 }
 
 async function loadLocationsAndDrawMap() {
   const kakao = getKakao()
-  if (!kakao?.maps) return
+  if (!kakao?.maps) {
+    locationsLoadError.value =
+      kakaoMapKey.value
+        ? '지도 스크립트가 아직 로드되지 않았습니다. 잠시 후 다시 시도하세요.'
+        : '지도를 사용하려면 frontend-location/.env에 VITE_KAKAO_MAP_KEY를 설정하세요.'
+    return
+  }
 
   locationsLoading.value = true
   locationsLoadError.value = null
+  let positions: { title: string; lat: number; lng: number; uploadDate: string; isMyLocation: boolean }[] =
+    []
   try {
-    const res = await locationUseCases.getLocations(100)
-    const list = res?.locations ?? []
+    const res = await locationUseCases.getLocations(500)
+    const raw = res?.locations
+    const list = Array.isArray(raw) ? raw : []
     locationsList.value = list
 
-    const positions = list.map((loc) => ({
+    if (list.length === 0) {
+      locationsLoadError.value =
+        'DB에 location이 없습니다. MySQL에서 location/src/main/resources/script.sql 의 location INSERT를 실행한 뒤 "지도 마커 새로고침"을 누르세요.'
+    }
+
+    positions = list.map((loc) => ({
       title: `위치 #${loc.no} · ${formatDateTime(loc.uploadDate)}`,
       lat: Number(loc.latitude),
       lng: Number(loc.longitude),
       uploadDate: formatDateTime(loc.uploadDate),
+      isMyLocation: false,
     }))
 
     if (positions.length === 0 && location.value) {
@@ -146,16 +216,39 @@ async function loadLocationsAndDrawMap() {
         lat: location.value.latitude,
         lng: location.value.longitude,
         uploadDate: formatDateTime(location.value.uploadDate),
+        isMyLocation: true,
       })
-    }
-
-    try {
-      drawKakaoMap(positions)
-    } catch (e) {
-      locationsLoadError.value = e instanceof Error ? e.message : '지도를 그리는 중 오류가 발생했습니다.'
     }
   } catch (e) {
     locationsLoadError.value = e instanceof Error ? e.message : '위치 목록을 불러올 수 없습니다.'
+  }
+
+  try {
+    if (location.value) {
+      const hasCurrent =
+        positions.some(
+          (p) =>
+            Math.abs(p.lat - location.value!.latitude) < 1e-5 &&
+            Math.abs(p.lng - location.value!.longitude) < 1e-5
+        )
+      if (!hasCurrent) {
+        positions = [
+          {
+            title: '내 위치',
+            lat: location.value.latitude,
+            lng: location.value.longitude,
+            uploadDate: formatDateTime(location.value.uploadDate),
+            isMyLocation: true,
+          },
+          ...positions,
+        ]
+      }
+    } else if (positions.length === 0) {
+      positions = []
+    }
+    drawKakaoMap(positions, location.value ?? undefined)
+  } catch (e) {
+    locationsLoadError.value = e instanceof Error ? e.message : '지도를 그리는 중 오류가 발생했습니다.'
   } finally {
     locationsLoading.value = false
   }
@@ -171,32 +264,25 @@ watch(
 
 onMounted(() => {
   fetchPage(1)
-  if (kakaoMapKey.value) {
-    if (getKakao()?.maps) {
+  if (!kakaoMapKey.value) {
+    locationsLoadError.value =
+      '지도를 사용하려면 frontend-location/.env에 VITE_KAKAO_MAP_KEY를 설정하세요.'
+    return
+  }
+  const k = getKakao()
+  if (!k?.maps) {
+    locationsLoadError.value =
+      '지도 스크립트를 불러올 수 없습니다. .env에 키 설정 후 개발 서버(pnpm run dev)를 재시작하세요.'
+    return
+  }
+  if (k.maps.load) {
+    k.maps.load(() => {
       loadLocationsAndDrawMap()
-      return
-    }
-    const script = document.createElement('script')
-    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoMapKey.value}`
-    script.async = true
-    script.onload = () => {
-      const k = getKakao()
-      if (k?.maps?.load) {
-        k.maps.load(() => {
-          loadLocationsAndDrawMap()
-          if (location.value) fetchLocation()
-        })
-      } else {
-        loadLocationsAndDrawMap()
-        if (location.value) fetchLocation()
-      }
-    }
-    script.onerror = () => {
-      locationsLoadError.value = '지도 스크립트를 불러올 수 없습니다.'
-    }
-    document.head.appendChild(script)
+      if (location.value) fetchLocation()
+    })
   } else {
-    locationsLoadError.value = '지도를 사용하려면 .env에 VITE_KAKAO_MAP_KEY를 설정하세요.'
+    loadLocationsAndDrawMap()
+    if (location.value) fetchLocation()
   }
 })
 
@@ -264,6 +350,7 @@ async function onRefreshLocation() {
 
 <template>
   <div class="app">
+    <p v-if="showBackendUnreachableBanner" class="error banner">{{ BACKEND_UNREACHABLE_MSG }}</p>
     <h1>현재 위치 (카카오맵)</h1>
     <p class="hint">아래 버튼으로 위치를 갱신하면 최신 위치가 저장되고, 읽지 않은 메시지를 받아옵니다. 지도에서 마커를 클릭하면 상세 정보가 뜨고, 닫기로 숨길 수 있습니다.</p>
     <button type="button" class="btn" :disabled="locationLoading" @click="onRefreshLocation">
@@ -275,16 +362,22 @@ async function onRefreshLocation() {
     <button type="button" class="btn secondary" :disabled="locationsLoading" @click="loadLocationsAndDrawMap">
       지도 마커 새로고침
     </button>
-    <p v-if="locationError" class="error">{{ locationError }}</p>
-    <p v-if="locationsLoadError" class="error">{{ locationsLoadError }}</p>
+    <p v-if="locationError && !isBackendUnreachable(locationError)" class="error">{{ locationError }}</p>
+    <p
+      v-if="locationsLoadError && !isBackendUnreachable(locationsLoadError)"
+      :class="locationsLoadError.includes('저장된 위치가 없습니다') || locationsLoadError.includes('DB에 location이 없습니다') ? 'hint' : 'error'"
+    >
+      {{ locationsLoadError }}
+    </p>
     <p v-if="location" class="info">
       마지막 갱신: {{ formatDateTime(location.uploadDate) }} · 위도: {{ location.latitude }}, 경도:
       {{ location.longitude }}
     </p>
+    <p v-if="locationsList.length > 0" class="hint">지도 마커: {{ locationsList.length }}개 (DB 저장 위치) · 내 위치는 별도 마커로 표시됩니다.</p>
     <div ref="mapContainer" class="map"></div>
 
     <h2>메시지 목록</h2>
-    <p v-if="messagesError" class="error">{{ messagesError }}</p>
+    <p v-if="messagesError && !isBackendUnreachable(messagesError)" class="error">{{ messagesError }}</p>
     <table class="table">
       <thead>
         <tr>
@@ -450,6 +543,12 @@ h2 {
 .error {
   color: #c00;
   margin: 0 0 8px;
+}
+.error.banner {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #fff0f0;
+  border-radius: 6px;
 }
 .btn {
   padding: 8px 16px;

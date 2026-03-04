@@ -4,7 +4,6 @@ import com.sleekydz86.location.domain.location.Coordinates
 import com.sleekydz86.location.domain.location.Location
 import com.sleekydz86.location.domain.location.LocationRepositoryPort
 import org.springframework.context.annotation.Primary
-import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -18,7 +17,7 @@ class LocationRepositoryAdapter(
         jpaRepository.findFirstByOrderByNoDesc()?.toDomain()
 
     override fun findRecent(limit: Int): List<Location> =
-        jpaRepository.findTopByOrderByNoDesc(PageRequest.of(0, limit.coerceAtLeast(1).coerceAtMost(500)))
+        jpaRepository.findAllOrderByNoDescLimit(limit.coerceAtLeast(1).coerceAtMost(500))
             .map { it.toDomain() }
 
     @Transactional

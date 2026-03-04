@@ -1,7 +1,7 @@
 -- =============================================================================
 -- finsight DB 스키마 (application.yml의 spring.datasource.url과 동일 DB 사용)
 -- 10만 명 동시 접속 가정: PK BIGINT, 인덱스 최소화·조회 패턴 기준 설계
---
+
 -- 조인: message.location_no = location.no (메시지 발송 위치)
 -- 예) SELECT m.*, l.latitude, l.longitude FROM message m LEFT JOIN location l ON m.location_no = l.no;
 -- =============================================================================
@@ -27,7 +27,6 @@ create index idx_location_coords on location (latitude, longitude);
 -- -----------------------------------------------------------------------------
 -- message: 메시지 (발신자, 본문, 발송 시각, 상태, 위치 FK)
 -- location_no로 location 테이블과 조인 → "이 메시지를 보낸 위치"
--- 10만 동시 접속 시 INSERT/UPDATE 동시 다발 → InnoDB, 인덱스 유지
 -- -----------------------------------------------------------------------------
 create table if not exists message (
     no bigint primary key auto_increment comment 'PK, 자동 증가',

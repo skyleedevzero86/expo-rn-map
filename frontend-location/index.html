@@ -5,6 +5,28 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>현재 위치</title>
+    <script>
+      (function () {
+        function filterKakao(msg) {
+          var s = msg != null ? String(msg) : '';
+          return s.indexOf('document.write') !== -1 && s.indexOf('parser-blocking') !== -1;
+        }
+        var w = console.warn, e = console.error;
+        if (typeof w === 'function') {
+          console.warn = function () {
+            if (filterKakao(arguments[0])) return;
+            return w.apply(console, arguments);
+          };
+        }
+        if (typeof e === 'function') {
+          console.error = function () {
+            if (filterKakao(arguments[0])) return;
+            return e.apply(console, arguments);
+          };
+        }
+      })();
+    </script>
+    <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=__VITE_KAKAO_MAP_KEY__"></script>
   </head>
   <body>
     <div id="app"></div>
