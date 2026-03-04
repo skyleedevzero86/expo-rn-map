@@ -1,0 +1,79 @@
+-- =============================================================================
+-- location DB 스키마
+-- 10만 명 동시 접속 가정: PK BIGINT, 인덱스 최소화·조회 패턴 기준 설계
+-- =============================================================================
+
+use location;
+
+-- -----------------------------------------------------------------------------
+-- location: 사용자/디바이스 위치 이력 (INSERT 다수, 최근 N건 조회 위주)
+-- 10만 동시 접속 시 row 수 급증 → no는 BIGINT (INT 한도 초과 방지)
+-- -----------------------------------------------------------------------------
+create table if not exists location (
+                                        no bigint primary key auto_increment comment 'PK, 자동 증가',
+                                        latitude double not null comment '위도 (-90 ~ 90)',
+                                        longitude double not null comment '경도 (-180 ~ 180)',
+                                        upload_date datetime not null comment '업로드 시각, 최근순 조회·인덱스 사용'
+) engine=InnoDB default charset=utf8mb4 comment '위치 좌표 저장 (동시 접속 대량 INSERT 대비)';
+
+-- 최근순 목록/지도 마커 조회용 (ORDER BY upload_date DESC LIMIT N)
+create index idx_location_upload_date on location (upload_date desc);
+-- 좌표 범위/지도 영역 조회용 (선택)
+create index idx_location_coords on location (latitude, longitude);
+
+-- -----------------------------------------------------------------------------
+-- message: 메시지 (발신자, 본문, 발송 시각, 상태)
+-- 10만 동시 접속 시 INSERT/UPDATE 동시 다발 → InnoDB, 인덱스 유지
+-- -----------------------------------------------------------------------------
+create table if not exists message (
+                                       no bigint primary key auto_increment comment 'PK, 자동 증가',
+                                       sender varchar(1000) comment '발신자 식별(닉네임/ID 등)',
+    message varchar(5000) comment '메시지 본문',
+    send_date datetime not null comment '발송 시각',
+    status int not null comment '0:대기 1:전송완료 2:실패 등'
+    ) engine=InnoDB default charset=utf8mb4 comment '메시지 저장 (동시 접속 대비)';
+
+-- 최근순 목록/페이징 조회용
+create index idx_message_send_date on message (send_date desc);
+-- 상태별 필터/대시보드용
+create index idx_message_status on message (status);
+
+-- =============================================================================
+-- 더미 데이터 (개발/테스트용, 10만 명 시나리오 참고용)
+-- =============================================================================
+
+insert into location (latitude, longitude, upload_date) values
+                                                            (37.5665, 126.9780, date_sub(now(), interval 1 minute)),
+                                                            (37.5666, 126.9782, date_sub(now(), interval 2 minute)),
+                                                            (37.5667, 126.9784, date_sub(now(), interval 3 minute)),
+                                                            (37.5668, 126.9786, date_sub(now(), interval 5 minute)),
+                                                            (37.5670, 126.9790, date_sub(now(), interval 10 minute)),
+                                                            (37.5672, 126.9792, date_sub(now(), interval 15 minute)),
+                                                            (37.5675, 126.9795, date_sub(now(), interval 20 minute)),
+                                                            (37.5680, 126.9800, date_sub(now(), interval 30 minute)),
+                                                            (37.5685, 126.9805, date_sub(now(), interval 1 hour)),
+                                                            (37.5690, 126.9810, date_sub(now(), interval 2 hour)),
+                                                            (37.5700, 126.9820, date_sub(now(), interval 3 hour)),
+                                                            (37.5710, 126.9830, date_sub(now(), interval 6 hour)),
+                                                            (37.5720, 126.9840, date_sub(now(), interval 12 hour)),
+                                                            (37.5730, 126.9850, date_sub(now(), interval 1 day)),
+                                                            (37.5740, 126.9860, date_sub(now(), interval 2 day)),
+                                                            (37.5750, 126.9870, date_sub(now(), interval 3 day)),
+                                                            (37.5760, 126.9880, date_sub(now(), interval 5 day)),
+                                                            (37.5770, 126.9890, date_sub(now(), interval 7 day)),
+                                                            (37.5780, 126.9900, date_sub(now(), interval 14 day)),
+                                                            (37.5790, 126.9910, date_sub(now(), interval 30 day));
+
+insert into message (sender, message, send_date, status) values
+                                                             ('user_001', '첫 번째 테스트 메시지입니다.', date_sub(now(), interval 1 minute), 1),
+                                                             ('user_002', '안녕하세요, 위치 공유 확인해 주세요.', date_sub(now(), interval 2 minute), 1),
+                                                             ('user_003', '도착했습니다.', date_sub(now(), interval 5 minute), 1),
+                                                             ('user_004', '곧 도착할 예정이에요.', date_sub(now(), interval 10 minute), 1),
+                                                             ('user_005', '주변 맛집 추천 부탁드려요.', date_sub(now(), interval 15 minute), 1),
+                                                             ('user_006', '날씨 좋네요!', date_sub(now(), interval 20 minute), 1),
+                                                             ('user_007', '비 오기 전에 와주세요.', date_sub(now(), interval 30 minute), 0),
+                                                             ('user_008', '예약 확인했습니다.', date_sub(now(), interval 1 hour), 1),
+                                                             ('user_009', '늦을 것 같아요.', date_sub(now(), interval 2 hour), 1),
+                                                             ('user_010', '여기서 만나요.', date_sub(now(), interval 3 hour), 1),
+                                                             ('user_011', '메시지 전송 실패 테스트', date_sub(now(), interval 5 minute), 2),
+                                                             ('user_012', '대기 중인 메시지', date_sub(now(), interval 1 minute), 0);
