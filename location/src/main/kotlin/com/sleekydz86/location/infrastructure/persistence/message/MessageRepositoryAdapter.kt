@@ -35,7 +35,7 @@ class MessageRepositoryAdapter(
     override fun findUnreadAndMarkAsRead(): List<Message> {
         val unread = jpaRepository.findByStatusOrderByNoDesc(MessageStatus.UNREAD)
         if (unread.isNotEmpty()) {
-            jpaRepository.markAllUnreadAsRead()
+            jpaRepository.markAllUnreadAsRead(MessageStatus.READ, MessageStatus.UNREAD)
             jpaRepository.flush()
         }
         return unread.map { it.toDomain() }
