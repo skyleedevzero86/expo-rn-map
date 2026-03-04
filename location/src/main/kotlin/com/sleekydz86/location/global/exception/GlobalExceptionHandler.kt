@@ -17,8 +17,8 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidation(ex: MethodArgumentNotValidException): ResponseEntity<ErrorBody> {
-        val errors = ex.bindingResult.allErrors.associate { err ->
-            (err as? FieldError)?.field ?: "알수없음" to (err.defaultMessage ?: "잘못된 값")
+        val errors: Map<String, String> = ex.bindingResult.allErrors.associate { err ->
+            ((err as? FieldError)?.field ?: "알수없음") to (err.defaultMessage ?: "잘못된 값")
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorBody("검증_오류", errors))
     }

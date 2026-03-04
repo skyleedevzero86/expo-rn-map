@@ -28,7 +28,7 @@ class LocationController(
 ) {
 
     @GetMapping("/mylocation")
-    fun getMyLocation(): ResponseEntity<LocationResponse?> {
+    fun getMyLocation(): ResponseEntity<*> {
         val location = getCurrentLocationUseCase.execute()
         return if (location != null) {
             ResponseEntity.ok(
@@ -40,7 +40,7 @@ class LocationController(
                 )
             )
         } else {
-            ResponseEntity.noContent().build()
+            ResponseEntity.noContent().build<Any>()
         }
     }
 
