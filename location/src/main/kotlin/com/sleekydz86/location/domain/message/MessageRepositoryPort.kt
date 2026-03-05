@@ -8,6 +8,9 @@ interface MessageRepositoryPort {
 
     fun save(message: Message): Message
 
+    fun findUnread(): List<Message>
     fun findUnreadAndMarkAsRead(): List<Message>
     fun findLatestByLocationIds(locationIds: List<Long>): Map<Long, Message>
+
+    fun markAsRead(messageNo: Long): Boolean
 }

@@ -6,22 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>현재 위치</title>
     <script>
-      (function () {
-        function filterKakao(msg) {
-          var s = msg != null ? String(msg) : '';
-          return s.indexOf('document.write') !== -1 && s.indexOf('parser-blocking') !== -1;
-        }
-        var w = console.warn, e = console.error;
+      (function(){
+        var w = console.warn;
         if (typeof w === 'function') {
-          console.warn = function () {
-            if (filterKakao(arguments[0])) return;
+          console.warn = function() {
+            var s = arguments[0] != null ? String(arguments[0]) : '';
+            if (s.indexOf('document.write') !== -1 && s.indexOf('parser-blocking') !== -1) return;
             return w.apply(console, arguments);
-          };
-        }
-        if (typeof e === 'function') {
-          console.error = function () {
-            if (filterKakao(arguments[0])) return;
-            return e.apply(console, arguments);
           };
         }
       })();

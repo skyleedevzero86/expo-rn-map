@@ -4,18 +4,21 @@ import com.sleekydz86.location.domain.location.Coordinates
 import com.sleekydz86.location.domain.location.Location
 import com.sleekydz86.location.domain.location.LocationRepositoryPort
 import com.sleekydz86.location.domain.location.LocationWithMessage
+import jakarta.persistence.EntityManager
+import jakarta.persistence.PersistenceContext
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Primary
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
-import java.time.Instant
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 @Component
 @Primary
 class LocationRepositoryAdapter(
-    private val jpaRepository: LocationJpaRepository
+    private val jpaRepository: LocationJpaRepository,
+    @PersistenceContext private val entityManager: EntityManager
 ) : LocationRepositoryPort {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -33,9 +36,22 @@ class LocationRepositoryAdapter(
 
     override fun findRecentWithLatestMessage(limit: Int): List<LocationWithMessage> {
         val safeLimit = limit.coerceAtLeast(1).coerceAtMost(500)
-        val pageable = PageRequest.of(0, safeLimit)
-        val readStatus = 1
-        val rows = jpaRepository.findRecentWithLatestMessage(pageable, readStatus)
+       
+        val sql = """
+            SELECT l.no, l.latitude, l.longitude, l.upload_date, latest.sender, latest.`message`, CAST(latest.status AS SIGNED)
+            FROM location l
+            INNER JOIN (
+                SELECT m.location_no, m.sender, m.`message`, m.status, m.send_date,
+                    ROW_NUMBER() OVER (PARTITION BY m.location_no ORDER BY m.send_date DESC) AS rn
+                FROM message m
+                WHERE m.location_no IS NOT NULL
+            ) latest ON latest.location_no = l.no AND latest.rn = 1
+            ORDER BY latest.send_date DESC
+            LIMIT $safeLimit
+            """
+        @Suppress("UNCHECKED_CAST")
+        val rows = entityManager.createNativeQuery(sql).resultList as List<Array<Any>>
+        log.info("[location] findRecentWithLatestMessage(limit={}) -> 위치(최신메시지1개씩) {} 건", safeLimit, rows.size)
         return rows.map { row ->
             val no = (row[0] as Number).toLong()
             val lat = (row[1] as Number).toDouble()
@@ -47,19 +63,14 @@ class LocationRepositoryAdapter(
             }
             val sender = (if (row.size > 4) row[4] else null)?.toString()?.takeIf { it.isNotBlank() }
             val message = (if (row.size > 5) row[5] else null)?.toString()?.takeIf { it.isNotBlank() }
+            val status = (if (row.size > 6) row[6] else null)?.let { (it as? Number)?.toInt() ?: 1 } ?: 1
             LocationWithMessage(
                 id = no,
                 coordinates = Coordinates(lat, lng),
                 uploadedAt = uploadDate,
                 sender = sender,
-                message = message
-            )
-        }.also { list ->
-            log.info(
-                "[location] findRecentWithLatestMessage(limit={}, readStatus=1) -> {} 건, location_no 목록: {}",
-                safeLimit,
-                list.size,
-                list.map { it.id }
+                message = message,
+                status = status
             )
         }
     }

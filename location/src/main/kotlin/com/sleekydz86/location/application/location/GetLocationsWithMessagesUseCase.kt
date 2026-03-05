@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service
 class GetLocationsWithMessagesUseCase(
     private val locationRepository: LocationRepositoryPort
 ) {
-   
     fun execute(limit: Int = 100): List<LocationWithMessage> =
         locationRepository.findRecentWithLatestMessage(limit)
 }

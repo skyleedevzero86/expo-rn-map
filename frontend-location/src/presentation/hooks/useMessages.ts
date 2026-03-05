@@ -42,6 +42,22 @@ export function useMessages() {
     }
   }
 
+  async function markAsRead(messageNo: number) {
+    error.value = null
+    try {
+      await messageUseCases.markMessageAsRead(messageNo)
+      const idx = messages.value.findIndex((m) => m.no === messageNo)
+      if (idx !== -1) {
+        messages.value = messages.value.map((m) =>
+          m.no === messageNo ? { ...m, status: 1 } : m
+        )
+      }
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : '읽음 처리에 실패했습니다.'
+      throw e
+    }
+  }
+
   return {
     messages,
     total,
@@ -51,5 +67,6 @@ export function useMessages() {
     error,
     fetchPage,
     sendMessage,
+    markAsRead,
   }
 }

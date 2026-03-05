@@ -1,12 +1,14 @@
 package com.sleekydz86.location.interfaces.web
 
 import com.sleekydz86.location.application.message.GetMessagesPaginatedUseCase
+import com.sleekydz86.location.application.message.MarkMessageAsReadUseCase
 import com.sleekydz86.location.application.message.SendMessageUseCase
 import com.sleekydz86.location.interfaces.dto.MessageResponse
 import com.sleekydz86.location.interfaces.dto.SendMessageRequest
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -17,7 +19,8 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api")
 class MessageController(
     private val getMessagesPaginatedUseCase: GetMessagesPaginatedUseCase,
-    private val sendMessageUseCase: SendMessageUseCase
+    private val sendMessageUseCase: SendMessageUseCase,
+    private val markMessageAsReadUseCase: MarkMessageAsReadUseCase
 ) {
 
     @GetMapping("/messages")
@@ -58,6 +61,13 @@ class MessageController(
                 status = MessageResponse.statusToInt(message.status)
             )
         )
+    }
+
+    @PostMapping("/messages/read/{no}")
+    fun markAsRead(@PathVariable no: Long): ResponseEntity<Unit> {
+        val updated = markMessageAsReadUseCase.execute(no)
+        return if (updated) ResponseEntity.noContent().build()
+        else ResponseEntity.notFound().build()
     }
 
     data class MessagesPageResponse(

@@ -9,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.servlet.resource.NoResourceFoundException
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -31,6 +32,11 @@ class GlobalExceptionHandler {
     @ExceptionHandler(MissingServletRequestParameterException::class)
     fun handleMissingParam(ex: MissingServletRequestParameterException): ResponseEntity<ErrorBody> {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ErrorBody("파라미터_누락", ex.message ?: "필수 파라미터가 없습니다."))
+    }
+
+    @ExceptionHandler(NoResourceFoundException::class)
+    fun handleNoResource(ex: NoResourceFoundException): ResponseEntity<ErrorBody> {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ErrorBody("NOT_FOUND", ex.resourcePath ?: "리소스를 찾을 수 없습니다."))
     }
 
     @ExceptionHandler(DataAccessException::class)

@@ -12,4 +12,5 @@ export interface IBackendApi {
   postLocationAndGetMessages(latitude: number, longitude: number): Promise<MessagesResponse>
   getMessages(page: number, pageSize?: number): Promise<MessagesPageResponse>
   sendMessage(sender: string, message: string): Promise<MessageItem>
+  markMessageAsRead(messageNo: number): Promise<void>
 }

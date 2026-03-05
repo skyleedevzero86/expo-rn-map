@@ -1,6 +1,6 @@
 import { createHttpBackendApi } from '@/infrastructure/api/HttpBackendApi'
 import { getCurrentLocation, getLocations, updateLocationAndGetMessages } from '@/application/use-cases/locationUseCases'
-import { getMessagesPage, sendMessage } from '@/application/use-cases/messageUseCases'
+import { getMessagesPage, sendMessage, markMessageAsRead } from '@/application/use-cases/messageUseCases'
 
 const api = createHttpBackendApi()
 
@@ -14,4 +14,5 @@ export const locationUseCases = {
 export const messageUseCases = {
   getMessagesPage: (page: number, pageSize: number) => getMessagesPage(api, page, pageSize),
   sendMessage: (sender: string, message: string) => sendMessage(api, sender, message),
+  markMessageAsRead: (messageNo: number) => markMessageAsRead(api, messageNo),
 }

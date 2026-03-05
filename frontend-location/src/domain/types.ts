@@ -5,6 +5,7 @@ export interface LocationResponse {
   uploadDate: string
   sender?: string | null
   message?: string | null
+  status?: number
 }
 
 export interface LocationsResponse {

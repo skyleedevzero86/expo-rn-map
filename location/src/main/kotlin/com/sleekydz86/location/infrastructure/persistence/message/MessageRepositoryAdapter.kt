@@ -34,6 +34,9 @@ class MessageRepositoryAdapter(
         return saved.toDomain()
     }
 
+    override fun findUnread(): List<Message> =
+        jpaRepository.findByStatusOrderByNoDesc(MessageStatus.UNREAD).map { it.toDomain() }
+
     @Transactional
     override fun findUnreadAndMarkAsRead(): List<Message> {
         val unread = jpaRepository.findByStatusOrderByNoDesc(MessageStatus.UNREAD)
@@ -55,6 +58,13 @@ class MessageRepositoryAdapter(
             log.warn("[findLatestByLocationIds] message 테이블에 행이 없습니다. script.sql 의 message INSERT 를 실행하세요.")
         }
         return map
+    }
+
+    @Transactional
+    override fun markAsRead(messageNo: Long): Boolean {
+        val updated = jpaRepository.markAsReadByNo(messageNo)
+        if (updated > 0) return true
+        return jpaRepository.existsById(messageNo)
     }
 }
 

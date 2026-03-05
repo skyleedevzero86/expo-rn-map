@@ -46,8 +46,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed')) {
-      throw new Error('네트워크 연결을 확인해 주세요.')
+    if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed') || msg.includes('ECONNREFUSED') || msg.includes('refused')) {
+      throw new Error(BACKEND_UNREACHABLE_MSG)
     }
     throw new Error('요청에 실패했습니다.')
   }
@@ -72,8 +72,9 @@ export function createHttpBackendApi(): IBackendApi {
     },
 
     getLocations(limit = 100): Promise<LocationsResponse> {
+      const limitVal = Math.min(500, Math.max(1, limit))
       return request<LocationsResponse>(
-        `/locations?limit=${Math.min(500, Math.max(1, limit))}`,
+        `/locations?limit=${limitVal}&_t=${Date.now()}`,
         { cache: 'no-store', headers: { Pragma: 'no-cache', 'Cache-Control': 'no-cache' } }
       )
     },
@@ -96,6 +97,10 @@ export function createHttpBackendApi(): IBackendApi {
         method: 'POST',
         body: JSON.stringify({ sender, message }),
       })
+    },
+
+    markMessageAsRead(messageNo: number): Promise<void> {
+      return request<void>(`/messages/read/${messageNo}`, { method: 'POST' })
     },
   }
 }

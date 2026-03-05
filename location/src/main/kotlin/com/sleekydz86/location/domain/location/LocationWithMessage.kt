@@ -7,5 +7,6 @@ data class LocationWithMessage(
     val coordinates: Coordinates,
     val uploadedAt: Instant,
     val sender: String?,
-    val message: String?
+    val message: String?,
+    val status: Int
 )

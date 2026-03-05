@@ -21,4 +21,8 @@ interface MessageJpaRepository : JpaRepository<MessageJpaEntity, Long> {
         @Param("readStatus") readStatus: MessageStatus,
         @Param("unreadStatus") unreadStatus: MessageStatus
     )
+
+    @Modifying(clearAutomatically = true)
+    @Query(value = "UPDATE message SET status = 1 WHERE no = :no", nativeQuery = true)
+    fun markAsReadByNo(@Param("no") no: Long): Int
 }

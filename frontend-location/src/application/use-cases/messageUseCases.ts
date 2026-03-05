@@ -16,3 +16,10 @@ export async function sendMessage(
 ): Promise<MessageItem> {
   return api.sendMessage(sender, message)
 }
+
+export async function markMessageAsRead(
+  api: IBackendApi,
+  messageNo: number
+): Promise<void> {
+  return api.markMessageAsRead(messageNo)
+}

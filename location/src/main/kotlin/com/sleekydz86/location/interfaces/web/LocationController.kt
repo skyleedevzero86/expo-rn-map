@@ -5,7 +5,6 @@ import com.sleekydz86.location.application.location.GetLocationsWithMessagesUseC
 import com.sleekydz86.location.application.location.UpdateLocationUseCase
 import com.sleekydz86.location.application.message.GetUnreadMessagesUseCase
 import com.sleekydz86.location.interfaces.dto.LocationResponse
-import com.sleekydz86.location.interfaces.dto.LocationsResponse
 import com.sleekydz86.location.interfaces.dto.MessageResponse
 import com.sleekydz86.location.interfaces.dto.MessagesResponse
 import com.sleekydz86.location.interfaces.dto.PostLocationRequest
@@ -45,19 +44,20 @@ class LocationController(
     }
 
     @GetMapping("/locations")
-    fun getLocations(@RequestParam(defaultValue = "100") limit: Int): ResponseEntity<LocationsResponse> {
+    fun getLocations(@RequestParam(defaultValue = "100") limit: Int): ResponseEntity<Any> {
         val safeLimit = limit.coerceIn(1, 500)
         val list = getLocationsWithMessagesUseCase.execute(safeLimit).map { loc ->
-            LocationResponse(
-                no = loc.id,
-                latitude = loc.coordinates.latitude,
-                longitude = loc.coordinates.longitude,
-                uploadDate = loc.uploadedAt,
-                sender = loc.sender,
-                message = loc.message
+            mapOf(
+                "no" to loc.id,
+                "latitude" to loc.coordinates.latitude,
+                "longitude" to loc.coordinates.longitude,
+                "uploadDate" to loc.uploadedAt,
+                "sender" to loc.sender,
+                "message" to loc.message,
+                "status" to loc.status
             )
         }
-        return ResponseEntity.ok(LocationsResponse(locations = list))
+        return ResponseEntity.ok(mapOf("locations" to list))
     }
 
     @PostMapping("/message")
