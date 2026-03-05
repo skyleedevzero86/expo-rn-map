@@ -1,0 +1,139 @@
+.kakao-overlay.wrap {
+  position: absolute;
+  left: 0;
+  bottom: 40px;
+  width: 288px;
+  margin-left: -144px;
+  text-align: left;
+  overflow: hidden;
+  font-size: 12px;
+  font-family: 'Malgun Gothic', dotum, '돋움', sans-serif;
+  line-height: 1.5;
+}
+.kakao-overlay.wrap * {
+  padding: 0;
+  margin: 0;
+}
+.kakao-overlay .info {
+  width: 286px;
+  min-height: 80px;
+  border-radius: 5px;
+  border-bottom: 2px solid #ccc;
+  border-right: 1px solid #ccc;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0px 1px 2px #888;
+}
+.kakao-overlay .info .title {
+  padding: 5px 0 0 10px;
+  height: 30px;
+  background: #eee;
+  border-bottom: 1px solid #ddd;
+  font-size: 14px;
+  font-weight: bold;
+}
+.kakao-overlay .info .close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 17px;
+  height: 17px;
+  background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/overlay_close.png');
+  cursor: pointer;
+}
+.kakao-overlay .info .body {
+  position: relative;
+  overflow: hidden;
+}
+.kakao-overlay .info .desc {
+  position: relative;
+  margin: 13px 10px;
+  height: auto;
+}
+.kakao-overlay .desc .ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kakao-overlay .desc .jibun {
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+}
+.kakao-overlay .info:after {
+  content: '';
+  position: absolute;
+  margin-left: -12px;
+  left: 50%;
+  bottom: 0;
+  width: 22px;
+  height: 12px;
+  background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/vertex_white.png');
+}
+.dot {
+  overflow: hidden;
+  float: left;
+  width: 12px;
+  height: 12px;
+  background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/mini_circle.png');
+}
+.path-dot {
+  background: #f90;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+.dotOverlay-side {
+  margin-left: 18px;
+}
+.dotOverlay {
+  position: relative;
+  bottom: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  border-bottom: 2px solid #ddd;
+  float: left;
+  font-size: 12px;
+  padding: 5px;
+  background: #fff;
+}
+.dotOverlay:nth-of-type(n) {
+  border: 0;
+  box-shadow: 0 1px 2px #888;
+}
+.dotOverlay .number {
+  font-weight: bold;
+  color: #ee6152;
+}
+.dotOverlay:after {
+  content: '';
+  position: absolute;
+  margin-left: -6px;
+  left: 50%;
+  bottom: -8px;
+  width: 11px;
+  height: 8px;
+  background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/vertex_white_small.png');
+}
+.distanceInfo {
+  position: relative;
+  top: 5px;
+  left: 5px;
+  list-style: none;
+  margin: 0;
+}
+.distanceInfo .label {
+  display: inline-block;
+  width: 50px;
+}
+.distanceInfo:after {
+  content: none;
+}
+.dotOverlay-side.distanceInfo:after,
+.dotOverlay-side .distanceInfo:after {
+  content: none;
+}
+.dotOverlay-side .dotOverlay:after {
+  left: -6px;
+  margin-left: 0;
+}

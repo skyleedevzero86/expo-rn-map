@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useLocation } from '@/presentation/hooks/useLocation'
 import { useMessages } from '@/presentation/hooks/useMessages'
-import { locationUseCases } from '@/composition'
+import { useLocationsMap } from '@/presentation/hooks/useLocationsMap'
 import { formatDateTime } from '@/presentation/utils/format'
-import type { MessageItem, LocationResponse } from '@/domain/types'
+import type { MessageItem } from '@/domain/types'
 
 const BACKEND_UNREACHABLE_MSG =
   '백엔드 서버에 연결할 수 없습니다. location 폴더에서 gradlew bootRun (Windows: gradlew.bat bootRun)으로 서버를 실행해 주세요.'
@@ -12,8 +12,14 @@ const BACKEND_UNREACHABLE_MSG =
 const isBackendUnreachable = (msg: string | null) =>
   msg != null && msg.trim() === BACKEND_UNREACHABLE_MSG.trim()
 
-const mapContainer = ref<HTMLDivElement | null>(null)
-const { location, loading: locationLoading, error: locationError, fetchLocation, updateLocation } = useLocation()
+const sender = ref('')
+const messageContent = ref('')
+const showMessageModal = ref(false)
+const unreadFromLocation = ref<MessageItem[]>([])
+
+const { location, loading: locationLoading, error: locationError, fetchLocation, updateLocation } =
+  useLocation()
+
 const {
   messages,
   total,
@@ -26,14 +32,16 @@ const {
   markAsRead,
 } = useMessages()
 
-const sender = ref('')
-const messageContent = ref('')
-const showMessageModal = ref(false)
-const unreadFromLocation = ref<MessageItem[]>([])
-const locationsList = ref<LocationResponse[]>([])
-const locationsLoading = ref(false)
-const locationsLoadError = ref<string | null>(null)
-const kakaoMapKey = ref(import.meta.env.VITE_KAKAO_MAP_KEY ?? '')
+const {
+  mapContainer,
+  selectedSender,
+  highlightedSenderCoords,
+  locationsList,
+  locationsLoading,
+  locationsLoadError,
+  loadLocationsAndDrawMap,
+  onSelectSender,
+} = useLocationsMap(location, fetchLocation)
 
 const showBackendUnreachableBanner = computed(
   () =>
@@ -41,490 +49,6 @@ const showBackendUnreachableBanner = computed(
     isBackendUnreachable(messagesError.value) ||
     isBackendUnreachable(locationsLoadError.value)
 )
-
-let mapInstance: ReturnType<Window['kakao']['maps']['Map']> | null = null
-const markersRef = ref<ReturnType<Window['kakao']['maps']['Marker']>[]>([])
-let currentOverlay: ReturnType<Window['kakao']['maps']['CustomOverlay']> | null = null
-let pathOverlays: { polyline: ReturnType<Window['kakao']['maps']['Polyline']>; overlays: ReturnType<Window['kakao']['maps']['CustomOverlay']>[] }[] = []
-let selectedMyMarker: ReturnType<Window['kakao']['maps']['Marker']> | null = null
-
-const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }
-
-function getKakao() {
-  return typeof window !== 'undefined' ? window.kakao : undefined
-}
-
-function overlayContent(
-  title: string,
-  uploadDate: string,
-  lat: number,
-  lng: number,
-  bodySecondLine?: string
-) {
-  const escape = (s: string) => s.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const escapedTitle = escape(title)
-  const escapedDate = escape(uploadDate)
-  const secondLine =
-    bodySecondLine != null && bodySecondLine !== ''
-      ? escape(bodySecondLine)
-      : `위도 ${lat.toFixed(5)}, 경도 ${lng.toFixed(5)}`
-  return (
-    '<div class="kakao-overlay wrap">' +
-    '  <div class="info">' +
-    '    <div class="title">' +
-    `      ${escapedTitle}` +
-    '      <div class="close" onclick="window.__closeKakaoOverlay && window.__closeKakaoOverlay()" title="닫기"></div>' +
-    '    </div>' +
-    '    <div class="body">' +
-    '      <div class="desc">' +
-    `        <div class="ellipsis">갱신 시각: ${escapedDate}</div>` +
-    `        <div class="jibun ellipsis">${secondLine}</div>` +
-    '      </div>' +
-    '    </div>' +
-    '  </div>' +
-    '</div>'
-  )
-}
-
-function closeOverlay() {
-  if (currentOverlay && getKakao()) {
-    currentOverlay.setMap(null)
-    currentOverlay = null
-  }
-  if (selectedMyMarker) {
-    const m = selectedMyMarker as unknown as { normalImage?: unknown; setImage?: (img: unknown) => void }
-    if (m.normalImage && m.setImage) m.setImage(m.normalImage)
-    selectedMyMarker = null
-  }
-}
-
-const SPRITE_MARKER_URL =
-  'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markers_sprites2.png'
-const MARKER_W = 33
-const MARKER_H = 36
-const OFFSET_X = 12
-const OFFSET_Y = MARKER_H
-const OVER_MARKER_W = 40
-const OVER_MARKER_H = 42
-const OVER_OFFSET_X = 13
-const OVER_OFFSET_Y = OVER_MARKER_H
-const SPRITE_GAP = 10
-const SPRITE_W = 126
-const SPRITE_H = 146
-const MY_MARKER_ROW = 2
-const RED_MARKER_URL = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png'
-
-function createSpriteMarkerImage(
-  kakao: { maps: { Size: (w: number, h: number) => unknown; Point: (x: number, y: number) => unknown; MarkerImage: new (url: string, size: unknown, opts?: unknown) => unknown } },
-  rowIndex: number
-) {
-  const Size = kakao.maps.Size
-  const Point = kakao.maps.Point
-  const MarkerImage = kakao.maps.MarkerImage
-  const markerSize = new Size(MARKER_W, MARKER_H)
-  const offset = new Point(OFFSET_X, OFFSET_Y)
-  const originY = (MARKER_H + SPRITE_GAP) * rowIndex
-  const spriteOrigin = new Point(0, originY)
-  const spriteSize = new Size(SPRITE_W, SPRITE_H)
-  return new MarkerImage(SPRITE_MARKER_URL, markerSize, {
-    offset,
-    spriteOrigin,
-    spriteSize,
-  })
-}
-
-function createMarkerImage(
-  kakao: { maps: { Size: (w: number, h: number) => unknown; Point: (x: number, y: number) => unknown; MarkerImage: new (url: string, size: unknown, opts?: unknown) => unknown } },
-  markerSize: unknown,
-  offset: unknown,
-  spriteOrigin: unknown
-) {
-  const Size = kakao.maps.Size
-  const MarkerImage = kakao.maps.MarkerImage
-  const spriteSize = new Size(SPRITE_W, SPRITE_H)
-  return new MarkerImage(SPRITE_MARKER_URL, markerSize, {
-    offset,
-    spriteOrigin,
-    spriteSize,
-  })
-}
-
-function getTimeHTML(distance: number): string {
-  const walkTime = Math.floor(distance / 67)
-  let walkHour = ''
-  const walkMin = '<span class="number">' + (walkTime % 60) + '</span>분'
-  if (walkTime > 60) {
-    walkHour = '<span class="number">' + Math.floor(walkTime / 60) + '</span>시간 '
-  }
-  const bycicleTime = Math.floor(distance / 227)
-  let bycicleHour = ''
-  const bycicleMin = '<span class="number">' + (bycicleTime % 60) + '</span>분'
-  if (bycicleTime > 60) {
-    bycicleHour = '<span class="number">' + Math.floor(bycicleTime / 60) + '</span>시간 '
-  }
-  let content = '<ul class="dotOverlay distanceInfo">'
-  content += '<li><span class="label">총거리</span><span class="number">' + distance + '</span>m</li>'
-  content += '<li><span class="label">도보</span>' + walkHour + walkMin + '</li>'
-  content += '<li><span class="label">자전거</span>' + bycicleHour + bycicleMin + '</li>'
-  content += '</ul>'
-  return content
-}
-
-function createRedMarkerImage(kakao: {
-  maps: { Size: (w: number, h: number) => unknown; Point: (x: number, y: number) => unknown; MarkerImage: new (url: string, size: unknown, opts?: unknown) => unknown }
-}) {
-  const Size = kakao.maps.Size
-  const Point = kakao.maps.Point
-  const MarkerImage = kakao.maps.MarkerImage
-  const size = new Size(64, 69)
-  const offset = new Point(27, 69)
-  return new MarkerImage(RED_MARKER_URL, size, { offset })
-}
-
-function createMyLocationMarkerImages(kakao: {
-  maps: {
-    Size: (w: number, h: number) => unknown
-    Point: (x: number, y: number) => unknown
-    MarkerImage: new (url: string, size: unknown, opts?: unknown) => unknown
-  }
-}) {
-  const redImage = createRedMarkerImage(kakao)
-  return {
-    normalImage: redImage,
-    overImage: redImage,
-    clickImage: redImage,
-  }
-}
-
-function drawKakaoMap(
-  positions: {
-    title: string
-    lat: number
-    lng: number
-    uploadDate: string
-    isMyLocation?: boolean
-    bodySecondLine?: string
-    status?: number
-  }[],
-  currentLocation?: { latitude: number; longitude: number; uploadDate: string } | null,
-  pathGroups?: { lat: number; lng: number }[][]
-) {
-  const kakao = getKakao()
-  if (!mapContainer.value || !kakao?.maps) return
-
-  const { Map, LatLng, Marker, Size, CustomOverlay, Polyline, event } = kakao.maps
-  const kakaoMaps = kakao.maps as Record<string, unknown>
-  const ZoomControlClass = kakaoMaps.ZoomControl as new () => { setMap?: (m: unknown) => void }
-  const ControlPosition = kakaoMaps.ControlPosition as { RIGHT: unknown }
-
-  selectedMyMarker = null
-  pathOverlays.forEach(({ polyline, overlays }) => {
-    polyline.setMap(null)
-    overlays.forEach((o) => o.setMap(null))
-  })
-  pathOverlays = []
-
-  const centerForMap =
-    currentLocation != null
-      ? new LatLng(currentLocation.latitude, currentLocation.longitude)
-      : positions.length > 0
-        ? new LatLng(positions[0].lat, positions[0].lng)
-        : new LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng)
-
-  if (!mapInstance) {
-    mapInstance = new Map(mapContainer.value, {
-      center: centerForMap,
-      level: 14,
-    })
-    if (ZoomControlClass && ControlPosition?.RIGHT) {
-      const zoomControl = new ZoomControlClass()
-      mapInstance.addControl(zoomControl, ControlPosition.RIGHT)
-    }
-  }
-  mapInstance.setZoomable(true)
-  mapInstance.setDraggable(true)
-
-  markersRef.value.forEach((m) => m.setMap(null))
-  markersRef.value = []
-  closeOverlay()
-
-  const myLocationImages = createMyLocationMarkerImages(kakao)
-  const dbMarkerImage = createSpriteMarkerImage(kakao, 1)
-
-  positions.forEach((pos) => {
-    const latlng = new LatLng(pos.lat, pos.lng)
-    const isMy = !!pos.isMyLocation
-    const image = isMy ? myLocationImages.normalImage : dbMarkerImage
-    const marker = new Marker({
-      map: mapInstance,
-      position: latlng,
-      title: pos.title,
-      image,
-    })
-    const content = overlayContent(
-      pos.title,
-      pos.uploadDate,
-      pos.lat,
-      pos.lng,
-      pos.bodySecondLine
-    )
-    const overlay = new CustomOverlay({
-      content,
-      map: null,
-      position: marker.getPosition(),
-    })
-
-    if (isMy) {
-      ;(marker as unknown as { normalImage?: unknown; setImage?: (img: unknown) => void }).normalImage = myLocationImages.normalImage
-      event.addListener(marker, 'mouseover', () => {
-        if (selectedMyMarker !== marker) {
-          ;(marker as unknown as { setImage?: (img: unknown) => void }).setImage(myLocationImages.overImage)
-        }
-      })
-      event.addListener(marker, 'mouseout', () => {
-        if (selectedMyMarker !== marker) {
-          ;(marker as unknown as { setImage?: (img: unknown) => void }).setImage(myLocationImages.normalImage)
-        }
-      })
-      event.addListener(marker, 'click', () => {
-        if (selectedMyMarker && selectedMyMarker !== marker) {
-          const prev = selectedMyMarker as unknown as { normalImage?: unknown; setImage?: (img: unknown) => void }
-          if (prev.normalImage && prev.setImage) prev.setImage(prev.normalImage)
-        }
-        ;(marker as unknown as { setImage?: (img: unknown) => void }).setImage(myLocationImages.clickImage)
-        selectedMyMarker = marker
-        closeOverlay()
-        overlay.setMap(mapInstance)
-        currentOverlay = overlay
-      })
-    } else {
-      event.addListener(marker, 'click', () => {
-        closeOverlay()
-        overlay.setMap(mapInstance)
-        currentOverlay = overlay
-      })
-    }
-    markersRef.value.push(marker)
-  })
-
-  if (pathGroups?.length && mapInstance) {
-    pathGroups.forEach((pathGroup) => {
-      if (pathGroup.length < 2) return
-      const path = pathGroup.map((p) => new LatLng(p.lat, p.lng))
-      const polyline = new Polyline({
-        map: mapInstance,
-        path,
-        strokeWeight: 3,
-        strokeColor: '#db4040',
-        strokeOpacity: 1,
-        strokeStyle: 'solid',
-      })
-      const overlays: ReturnType<Window['kakao']['maps']['CustomOverlay']>[] = []
-      path.forEach((position, i) => {
-        const circleOverlay = new CustomOverlay({
-          content: '<span class="dot"></span>',
-          position,
-          zIndex: 1,
-        })
-        circleOverlay.setMap(mapInstance)
-        overlays.push(circleOverlay)
-        if (i > 0 && i < path.length - 1) {
-          const segPath = path.slice(0, i + 1)
-          const segPoly = new Polyline({ path: segPath })
-          const distance = Math.round(segPoly.getLength())
-          const distanceOverlay = new CustomOverlay({
-            content: '<div class="dotOverlay">거리 <span class="number">' + distance + '</span>m</div>',
-            position,
-            yAnchor: 1,
-            zIndex: 2,
-          })
-          distanceOverlay.setMap(mapInstance)
-          overlays.push(distanceOverlay)
-        }
-      })
-      const totalDistance = Math.round(polyline.getLength())
-      const lastPos = path[path.length - 1]
-      const totalOverlay = new CustomOverlay({
-        content: getTimeHTML(totalDistance),
-        position: lastPos,
-        xAnchor: 0,
-        yAnchor: 0,
-        zIndex: 3,
-      })
-      totalOverlay.setMap(mapInstance)
-      overlays.push(totalOverlay)
-      pathOverlays.push({ polyline, overlays })
-    })
-  }
-
-  if (typeof window !== 'undefined') {
-    ;(window as unknown as { __closeKakaoOverlay?: () => void }).__closeKakaoOverlay = closeOverlay
-  }
-
-  mapInstance.setCenter(centerForMap)
-}
-
-async function loadLocationsAndDrawMap() {
-  const kakao = getKakao()
-  if (!kakao?.maps) {
-    locationsLoadError.value =
-      kakaoMapKey.value
-        ? '지도 스크립트가 아직 로드되지 않았습니다. 잠시 후 다시 시도하세요.'
-        : '지도를 사용하려면 frontend-location/.env에 VITE_KAKAO_MAP_KEY를 설정하세요.'
-    return
-  }
-
-  locationsLoading.value = true
-  locationsLoadError.value = null
-  locationsList.value = []
-  let pathGroups: { lat: number; lng: number }[][] = []
-  let positions: {
-    title: string
-    lat: number
-    lng: number
-    uploadDate: string
-    isMyLocation: boolean
-    bodySecondLine?: string
-    status?: number
-  }[] = []
-  try {
-    const res = await locationUseCases.getLocations(500)
-    const raw = res?.locations
-    const all = Array.isArray(raw) ? raw : []
-    const list = all
-    const statusZero = all.filter((loc) => Number(loc.status) === 0)
-
-    if (statusZero.length > 0) {
-      console.log('[지도 마커] loc.status=0 (안읽음, 마커 제외):', statusZero.map((loc) => ({ no: loc.no, latitude: loc.latitude, longitude: loc.longitude, uploadDate: loc.uploadDate, sender: loc.sender, message: loc.message, status: loc.status })))
-    }
-
-   
-
-    locationsList.value = list
-    const toLat = (loc: { latitude?: number; lat?: number }) => Number(loc.latitude ?? (loc as { lat?: number }).lat)
-    const toLng = (loc: { longitude?: number; lng?: number }) => Number(loc.longitude ?? (loc as { lng?: number }).lng)
-    if (list.length === 0) {
-      locationsLoadError.value =
-        'DB에 location이 없습니다. MySQL에서 location/src/main/resources/script.sql 의 location INSERT를 실행한 뒤 "지도 마커 새로고침"을 누르세요.'
-    }
-
-
-    const listForMarkers = list.filter((loc) => Number(loc.status) === 1)
-    positions = listForMarkers.map((loc) => {
-      const messageText =
-        (loc as { message?: string; content?: string }).message ??
-        (loc as { message?: string; content?: string }).content ??
-        ''
-      const senderText = loc.sender ?? ''
-      const hasAuthorMessage = senderText !== '' || messageText !== ''
-      const title = hasAuthorMessage
-        ? `작성자 ${senderText || '(알 수 없음)'} : ${messageText.length > 40 ? messageText.slice(0, 40) + '…' : messageText || '(메시지 없음)'}`
-        : `위치 #${loc.no} · ${formatDateTime(loc.uploadDate)}`
-      return {
-        title,
-        lat: toLat(loc),
-        lng: toLng(loc),
-        uploadDate: formatDateTime(loc.uploadDate),
-        isMyLocation: false,
-        bodySecondLine: messageText !== '' ? messageText : undefined,
-        status: loc.status !== undefined && loc.status !== null ? Number(loc.status) : 1,
-      }
-    })
-
-    const groups = new Map<string, LocationResponse[]>()
-    listForMarkers.forEach((loc) => {
-      const key = (loc.sender ?? '').trim()
-      if (!groups.has(key)) groups.set(key, [])
-      groups.get(key)!.push(loc)
-    })
-    groups.forEach((arr) => {
-      arr.sort((a, b) => String(a.uploadDate).localeCompare(String(b.uploadDate)))
-      if (arr.length >= 2) {
-        pathGroups.push(arr.map((l) => ({ lat: toLat(l), lng: toLng(l) })))
-      }
-    })
-    if (pathGroups.length === 0 && listForMarkers.length >= 2) {
-      const sorted = [...listForMarkers].sort((a, b) => String(a.uploadDate).localeCompare(String(b.uploadDate)))
-      pathGroups.push(sorted.map((l) => ({ lat: toLat(l), lng: toLng(l) })))
-    }
-
-    const myLat = location.value?.latitude
-    const myLng = location.value?.longitude
-    const isSameCoord = (p: { lat: number; lng: number }) =>
-      myLat != null && myLng != null &&
-      Math.abs(p.lat - myLat) < 1e-5 && Math.abs(p.lng - myLng) < 1e-5
-    if (myLat != null && myLng != null) {
-      positions = positions.filter((p) => !isSameCoord(p))
-      positions = [
-        {
-          title: '내 위치',
-          lat: myLat,
-          lng: myLng,
-          uploadDate: location.value ? formatDateTime(location.value.uploadDate) : '',
-          isMyLocation: true,
-          bodySecondLine: `위도 ${myLat.toFixed(5)}, 경도 ${myLng.toFixed(5)}`,
-          status: 1,
-        },
-        ...positions,
-      ]
-    }
-
-    console.log('[지도 마커] 그릴 마커 개수:', positions.length)
-    console.log('[지도 마커] 그릴 마커 전체:', positions.map((p, i) => ({ index: i, title: p.title, lat: p.lat, lng: p.lng, uploadDate: p.uploadDate, isMyLocation: p.isMyLocation, bodySecondLine: p.bodySecondLine })))
-  } catch (e) {
-    locationsLoadError.value = e instanceof Error ? e.message : '위치 목록을 불러올 수 없습니다.'
-  }
-
-  try {
-    drawKakaoMap(positions, location.value ?? undefined, pathGroups)
-  } catch (e) {
-    locationsLoadError.value = e instanceof Error ? e.message : '지도를 그리는 중 오류가 발생했습니다.'
-  } finally {
-    locationsLoading.value = false
-  }
-}
-
-watch(
-  location,
-  (loc) => {
-    if (loc && locationsList.value.length === 0) loadLocationsAndDrawMap()
-  },
-  { immediate: true }
-)
-
-onMounted(() => {
-  fetchPage(1)
-  if (!kakaoMapKey.value) {
-    locationsLoadError.value =
-      '지도를 사용하려면 frontend-location/.env에 VITE_KAKAO_MAP_KEY를 설정하세요.'
-    return
-  }
-  const k = getKakao()
-  if (!k?.maps) {
-    locationsLoadError.value = '지도 스크립트를 불러올 수 없습니다. .env에 키 설정 후 개발 서버를 재시작하세요.'
-    return
-  }
-  if (k.maps.load) {
-    k.maps.load(() => {
-      loadLocationsAndDrawMap()
-      if (location.value) fetchLocation()
-    })
-  } else {
-    loadLocationsAndDrawMap()
-    if (location.value) fetchLocation()
-  }
-})
-
-onUnmounted(() => {
-  closeOverlay()
-  pathOverlays.forEach(({ polyline, overlays }) => {
-    polyline.setMap(null)
-    overlays.forEach((o) => o.setMap(null))
-  })
-  pathOverlays = []
-  markersRef.value = []
-  mapInstance = null
-})
 
 async function onSubmitMessage(e: Event) {
   e.preventDefault()
@@ -560,6 +84,10 @@ function geolocationErrorMessage(code: number): string {
       return '위치를 가져올 수 없습니다.'
   }
 }
+
+onMounted(() => {
+  fetchPage(1)
+})
 
 async function onRefreshLocation() {
   if (!navigator.geolocation) {
@@ -609,6 +137,12 @@ async function onRefreshLocation() {
       {{ location.longitude }}
     </p>
     <p v-if="locationsList.length > 0" class="hint">지도 마커: {{ locationsList.length }}개 (DB 저장 위치) · 내 위치는 별도 마커로 표시됩니다.</p>
+    <p v-if="selectedSender && highlightedSenderCoords.length > 0" class="hint">
+      선택 작성자 {{ selectedSender }} (DB 저장 위치 {{ highlightedSenderCoords.length }}곳):
+      <span v-for="(c, i) in highlightedSenderCoords" :key="i">
+        위도 {{ c.lat.toFixed(5) }}, 경도 {{ c.lng.toFixed(5) }}<template v-if="Number(i) < highlightedSenderCoords.length - 1"> · </template>
+      </span>
+    </p>
     <div ref="mapContainer" class="map"></div>
 
     <div class="message-list-header">
@@ -630,7 +164,12 @@ async function onRefreshLocation() {
         <tr v-for="msg in messages" :key="msg.no">
           <td>{{ msg.no }}</td>
           <td>{{ msg.message }}</td>
-          <td>{{ msg.sender }}</td>
+          <td
+            :class="{ 'sender-cell': msg.status === 1 }"
+            @click="msg.status === 1 && onSelectSender(msg.sender)"
+          >
+            {{ msg.sender }}
+          </td>
           <td>{{ formatDateTime(msg.sendDate) }}</td>
           <td>
             <button
@@ -693,294 +232,3 @@ async function onRefreshLocation() {
     </div>
   </div>
 </template>
-
-<style>
-.kakao-overlay.wrap {
-  position: absolute;
-  left: 0;
-  bottom: 40px;
-  width: 288px;
-  margin-left: -144px;
-  text-align: left;
-  overflow: hidden;
-  font-size: 12px;
-  font-family: 'Malgun Gothic', dotum, '돋움', sans-serif;
-  line-height: 1.5;
-}
-.kakao-overlay.wrap * {
-  padding: 0;
-  margin: 0;
-}
-.kakao-overlay .info {
-  width: 286px;
-  min-height: 80px;
-  border-radius: 5px;
-  border-bottom: 2px solid #ccc;
-  border-right: 1px solid #ccc;
-  overflow: hidden;
-  background: #fff;
-  box-shadow: 0px 1px 2px #888;
-}
-.kakao-overlay .info .title {
-  padding: 5px 0 0 10px;
-  height: 30px;
-  background: #eee;
-  border-bottom: 1px solid #ddd;
-  font-size: 14px;
-  font-weight: bold;
-}
-.kakao-overlay .info .close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 17px;
-  height: 17px;
-  background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/overlay_close.png');
-  cursor: pointer;
-}
-.kakao-overlay .info .body {
-  position: relative;
-  overflow: hidden;
-}
-.kakao-overlay .info .desc {
-  position: relative;
-  margin: 13px 10px;
-  height: auto;
-}
-.kakao-overlay .desc .ellipsis {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.kakao-overlay .desc .jibun {
-  font-size: 11px;
-  color: #888;
-  margin-top: 4px;
-}
-.kakao-overlay .info:after {
-  content: '';
-  position: absolute;
-  margin-left: -12px;
-  left: 50%;
-  bottom: 0;
-  width: 22px;
-  height: 12px;
-  background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/vertex_white.png');
-}
-.dot {
-  overflow: hidden;
-  float: left;
-  width: 12px;
-  height: 12px;
-  background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/mini_circle.png');
-}
-.dotOverlay {
-  position: relative;
-  bottom: 10px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  border-bottom: 2px solid #ddd;
-  float: left;
-  font-size: 12px;
-  padding: 5px;
-  background: #fff;
-}
-.dotOverlay:nth-of-type(n) {
-  border: 0;
-  box-shadow: 0 1px 2px #888;
-}
-.dotOverlay .number {
-  font-weight: bold;
-  color: #ee6152;
-}
-.dotOverlay:after {
-  content: '';
-  position: absolute;
-  margin-left: -6px;
-  left: 50%;
-  bottom: -8px;
-  width: 11px;
-  height: 8px;
-  background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/vertex_white_small.png');
-}
-.distanceInfo {
-  position: relative;
-  top: 5px;
-  left: 5px;
-  list-style: none;
-  margin: 0;
-}
-.distanceInfo .label {
-  display: inline-block;
-  width: 50px;
-}
-.distanceInfo:after {
-  content: none;
-}
-</style>
-
-<style scoped>
-* {
-  box-sizing: border-box;
-}
-.app {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 24px;
-  background: #fff;
-  min-height: 100vh;
-}
-h1 {
-  margin: 0 0 8px;
-  font-size: 1.5rem;
-}
-.message-list-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 32px 0 12px;
-}
-.message-list-header h2 {
-  margin: 0;
-  font-size: 1.25rem;
-}
-h2 {
-  margin: 32px 0 12px;
-  font-size: 1.25rem;
-}
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.modal-panel {
-  background: #fff;
-  border-radius: 8px;
-  padding: 24px;
-  max-width: 480px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-}
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.modal-header h2 {
-  margin: 0;
-  font-size: 1.25rem;
-}
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
-  color: #666;
-  padding: 0 4px;
-}
-.modal-close:hover {
-  color: #000;
-}
-.hint {
-  color: #666;
-  margin: 0 0 12px;
-}
-.info {
-  color: #333;
-  margin: 0 0 12px;
-}
-.error {
-  color: #c00;
-  margin: 0 0 8px;
-}
-.error.banner {
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  background: #fff0f0;
-  border-radius: 6px;
-}
-.btn {
-  padding: 8px 16px;
-  margin-right: 8px;
-  margin-bottom: 8px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
-  font-size: 14px;
-}
-.btn:hover:not(:disabled) {
-  background: #f0f0f0;
-}
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.btn.secondary {
-  background: #f0f0f0;
-}
-.btn.small {
-  padding: 4px 12px;
-  font-size: 13px;
-}
-.map {
-  width: 100%;
-  height: 560px;
-  background: #e0e0e0;
-  margin: 12px 0;
-  border-radius: 8px;
-}
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 12px 0;
-}
-.table th,
-.table td {
-  border: 1px solid #ddd;
-  padding: 8px 12px;
-  text-align: left;
-}
-.table th {
-  background: #f8f8f8;
-  font-weight: 600;
-}
-.table .pager {
-  text-align: center;
-  background: #fafafa;
-}
-.page-info {
-  margin: 0 12px;
-}
-.form {
-  margin-top: 12px;
-}
-.field {
-  margin-bottom: 12px;
-}
-.field label {
-  display: block;
-  margin-bottom: 4px;
-  font-weight: 500;
-}
-.field input,
-.field textarea {
-  width: 100%;
-  max-width: 600px;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 14px;
-}
-.field textarea {
-  resize: vertical;
-}
-</style>

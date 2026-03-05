@@ -34,3 +34,16 @@ export interface SendMessageRequest {
   sender: string
   message: string
 }
+
+export interface MapPosition {
+  title: string
+  lat: number
+  lng: number
+  uploadDate: string
+  isMyLocation: boolean
+  bodySecondLine?: string
+  status?: number
+  sender?: string
+}
+
+export type PathGroup = { lat: number; lng: number }[]

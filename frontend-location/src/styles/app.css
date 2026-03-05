@@ -1,0 +1,170 @@
+* {
+  box-sizing: border-box;
+}
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+  background: #fff;
+  min-height: 100vh;
+}
+.app h1 {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+}
+.app .message-list-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 32px 0 12px;
+}
+.app .message-list-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.app h2 {
+  margin: 32px 0 12px;
+  font-size: 1.25rem;
+}
+.app .modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.app .modal-panel {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 480px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+.app .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.app .modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.app .modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #666;
+  padding: 0 4px;
+}
+.app .modal-close:hover {
+  color: #000;
+}
+.app .hint {
+  color: #666;
+  margin: 0 0 12px;
+}
+.app .info {
+  color: #333;
+  margin: 0 0 12px;
+}
+.app .error {
+  color: #c00;
+  margin: 0 0 8px;
+}
+.app .error.banner {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #fff0f0;
+  border-radius: 6px;
+}
+.app .btn {
+  padding: 8px 16px;
+  margin-right: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+.app .btn:hover:not(:disabled) {
+  background: #f0f0f0;
+}
+.app .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.app .btn.secondary {
+  background: #f0f0f0;
+}
+.app .btn.small {
+  padding: 4px 12px;
+  font-size: 13px;
+}
+.app .map {
+  width: 100%;
+  height: 560px;
+  background: #e0e0e0;
+  margin: 12px 0;
+  border-radius: 8px;
+}
+.app .table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+}
+.app .table th,
+.app .table td {
+  border: 1px solid #ddd;
+  padding: 8px 12px;
+  text-align: left;
+}
+.app .table th {
+  background: #f8f8f8;
+  font-weight: 600;
+}
+.app .table .sender-cell {
+  cursor: pointer;
+  color: #d35400;
+}
+.app .table .sender-cell:hover {
+  color: #e67e22;
+}
+.app .table .pager {
+  text-align: center;
+  background: #fafafa;
+}
+.app .page-info {
+  margin: 0 12px;
+}
+.app .form {
+  margin-top: 12px;
+}
+.app .field {
+  margin-bottom: 12px;
+}
+.app .field label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+.app .field input,
+.app .field textarea {
+  width: 100%;
+  max-width: 600px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+}
+.app .field textarea {
+  resize: vertical;
+}
