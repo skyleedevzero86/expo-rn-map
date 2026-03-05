@@ -17,13 +17,35 @@ interface KakaoMaps {
     Marker: new (options: { map: unknown; position: unknown; title?: string; image?: unknown }) => {
       getPosition: () => unknown
       setMap: (map: unknown) => void
+      setImage: (image: unknown) => void
     }
+    Point: new (x: number, y: number) => unknown
     MarkerImage: new (src: string, size: unknown) => unknown
     Size: new (width: number, height: number) => unknown
-    CustomOverlay: new (options: { content: string; map: unknown; position: unknown }) => {
+    CustomOverlay: new (options: {
+      content: string
+      map?: unknown
+      position: unknown
+      xAnchor?: number
+      yAnchor?: number
+      zIndex?: number
+    }) => {
       setMap: (map: unknown) => void
       setContent: (content: string) => void
       setPosition: (position: unknown) => void
+    }
+    Polyline: new (options: {
+      map?: unknown
+      path: unknown[]
+      strokeWeight?: number
+      strokeColor?: string
+      strokeOpacity?: number
+      strokeStyle?: string
+    }) => {
+      setMap: (map: unknown) => void
+      setPath: (path: unknown[]) => void
+      getPath: () => unknown[]
+      getLength: () => number
     }
     event: {
       addListener: (target: unknown, type: string, handler: () => void) => void

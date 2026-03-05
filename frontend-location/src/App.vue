@@ -45,6 +45,8 @@ const showBackendUnreachableBanner = computed(
 let mapInstance: ReturnType<Window['kakao']['maps']['Map']> | null = null
 const markersRef = ref<ReturnType<Window['kakao']['maps']['Marker']>[]>([])
 let currentOverlay: ReturnType<Window['kakao']['maps']['CustomOverlay']> | null = null
+let pathOverlays: { polyline: ReturnType<Window['kakao']['maps']['Polyline']>; overlays: ReturnType<Window['kakao']['maps']['CustomOverlay']>[] }[] = []
+let selectedMyMarker: ReturnType<Window['kakao']['maps']['Marker']> | null = null
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }
 
@@ -89,15 +91,28 @@ function closeOverlay() {
     currentOverlay.setMap(null)
     currentOverlay = null
   }
+  if (selectedMyMarker) {
+    const m = selectedMyMarker as unknown as { normalImage?: unknown; setImage?: (img: unknown) => void }
+    if (m.normalImage && m.setImage) m.setImage(m.normalImage)
+    selectedMyMarker = null
+  }
 }
 
 const SPRITE_MARKER_URL =
   'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markers_sprites2.png'
 const MARKER_W = 33
 const MARKER_H = 36
+const OFFSET_X = 12
+const OFFSET_Y = MARKER_H
+const OVER_MARKER_W = 40
+const OVER_MARKER_H = 42
+const OVER_OFFSET_X = 13
+const OVER_OFFSET_Y = OVER_MARKER_H
 const SPRITE_GAP = 10
 const SPRITE_W = 126
 const SPRITE_H = 146
+const MY_MARKER_ROW = 2
+const RED_MARKER_URL = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png'
 
 function createSpriteMarkerImage(
   kakao: { maps: { Size: (w: number, h: number) => unknown; Point: (x: number, y: number) => unknown; MarkerImage: new (url: string, size: unknown, opts?: unknown) => unknown } },
@@ -107,7 +122,7 @@ function createSpriteMarkerImage(
   const Point = kakao.maps.Point
   const MarkerImage = kakao.maps.MarkerImage
   const markerSize = new Size(MARKER_W, MARKER_H)
-  const offset = new Point(12, MARKER_H)
+  const offset = new Point(OFFSET_X, OFFSET_Y)
   const originY = (MARKER_H + SPRITE_GAP) * rowIndex
   const spriteOrigin = new Point(0, originY)
   const spriteSize = new Size(SPRITE_W, SPRITE_H)
@@ -116,6 +131,69 @@ function createSpriteMarkerImage(
     spriteOrigin,
     spriteSize,
   })
+}
+
+function createMarkerImage(
+  kakao: { maps: { Size: (w: number, h: number) => unknown; Point: (x: number, y: number) => unknown; MarkerImage: new (url: string, size: unknown, opts?: unknown) => unknown } },
+  markerSize: unknown,
+  offset: unknown,
+  spriteOrigin: unknown
+) {
+  const Size = kakao.maps.Size
+  const MarkerImage = kakao.maps.MarkerImage
+  const spriteSize = new Size(SPRITE_W, SPRITE_H)
+  return new MarkerImage(SPRITE_MARKER_URL, markerSize, {
+    offset,
+    spriteOrigin,
+    spriteSize,
+  })
+}
+
+function getTimeHTML(distance: number): string {
+  const walkTime = Math.floor(distance / 67)
+  let walkHour = ''
+  const walkMin = '<span class="number">' + (walkTime % 60) + '</span>분'
+  if (walkTime > 60) {
+    walkHour = '<span class="number">' + Math.floor(walkTime / 60) + '</span>시간 '
+  }
+  const bycicleTime = Math.floor(distance / 227)
+  let bycicleHour = ''
+  const bycicleMin = '<span class="number">' + (bycicleTime % 60) + '</span>분'
+  if (bycicleTime > 60) {
+    bycicleHour = '<span class="number">' + Math.floor(bycicleTime / 60) + '</span>시간 '
+  }
+  let content = '<ul class="dotOverlay distanceInfo">'
+  content += '<li><span class="label">총거리</span><span class="number">' + distance + '</span>m</li>'
+  content += '<li><span class="label">도보</span>' + walkHour + walkMin + '</li>'
+  content += '<li><span class="label">자전거</span>' + bycicleHour + bycicleMin + '</li>'
+  content += '</ul>'
+  return content
+}
+
+function createRedMarkerImage(kakao: {
+  maps: { Size: (w: number, h: number) => unknown; Point: (x: number, y: number) => unknown; MarkerImage: new (url: string, size: unknown, opts?: unknown) => unknown }
+}) {
+  const Size = kakao.maps.Size
+  const Point = kakao.maps.Point
+  const MarkerImage = kakao.maps.MarkerImage
+  const size = new Size(64, 69)
+  const offset = new Point(27, 69)
+  return new MarkerImage(RED_MARKER_URL, size, { offset })
+}
+
+function createMyLocationMarkerImages(kakao: {
+  maps: {
+    Size: (w: number, h: number) => unknown
+    Point: (x: number, y: number) => unknown
+    MarkerImage: new (url: string, size: unknown, opts?: unknown) => unknown
+  }
+}) {
+  const redImage = createRedMarkerImage(kakao)
+  return {
+    normalImage: redImage,
+    overImage: redImage,
+    clickImage: redImage,
+  }
 }
 
 function drawKakaoMap(
@@ -128,15 +206,23 @@ function drawKakaoMap(
     bodySecondLine?: string
     status?: number
   }[],
-  currentLocation?: { latitude: number; longitude: number; uploadDate: string } | null
+  currentLocation?: { latitude: number; longitude: number; uploadDate: string } | null,
+  pathGroups?: { lat: number; lng: number }[][]
 ) {
   const kakao = getKakao()
   if (!mapContainer.value || !kakao?.maps) return
 
-  const { Map, LatLng, Marker, Size, CustomOverlay, event } = kakao.maps
+  const { Map, LatLng, Marker, Size, CustomOverlay, Polyline, event } = kakao.maps
   const kakaoMaps = kakao.maps as Record<string, unknown>
   const ZoomControlClass = kakaoMaps.ZoomControl as new () => { setMap?: (m: unknown) => void }
   const ControlPosition = kakaoMaps.ControlPosition as { RIGHT: unknown }
+
+  selectedMyMarker = null
+  pathOverlays.forEach(({ polyline, overlays }) => {
+    polyline.setMap(null)
+    overlays.forEach((o) => o.setMap(null))
+  })
+  pathOverlays = []
 
   const centerForMap =
     currentLocation != null
@@ -162,21 +248,19 @@ function drawKakaoMap(
   markersRef.value = []
   closeOverlay()
 
-  const myMarkerImage = createSpriteMarkerImage(kakao, 0)
+  const myLocationImages = createMyLocationMarkerImages(kakao)
   const dbMarkerImage = createSpriteMarkerImage(kakao, 1)
 
   positions.forEach((pos) => {
     const latlng = new LatLng(pos.lat, pos.lng)
-    const image = pos.isMyLocation ? myMarkerImage : dbMarkerImage
+    const isMy = !!pos.isMyLocation
+    const image = isMy ? myLocationImages.normalImage : dbMarkerImage
     const marker = new Marker({
       map: mapInstance,
       position: latlng,
       title: pos.title,
       image,
     })
-    ;(marker as unknown as { normalImage?: unknown }).normalImage = image
-    markersRef.value.push(marker)
-
     const content = overlayContent(
       pos.title,
       pos.uploadDate,
@@ -190,12 +274,88 @@ function drawKakaoMap(
       position: marker.getPosition(),
     })
 
-    event.addListener(marker, 'click', () => {
-      closeOverlay()
-      overlay.setMap(mapInstance)
-      currentOverlay = overlay
-    })
+    if (isMy) {
+      ;(marker as unknown as { normalImage?: unknown; setImage?: (img: unknown) => void }).normalImage = myLocationImages.normalImage
+      event.addListener(marker, 'mouseover', () => {
+        if (selectedMyMarker !== marker) {
+          ;(marker as unknown as { setImage?: (img: unknown) => void }).setImage(myLocationImages.overImage)
+        }
+      })
+      event.addListener(marker, 'mouseout', () => {
+        if (selectedMyMarker !== marker) {
+          ;(marker as unknown as { setImage?: (img: unknown) => void }).setImage(myLocationImages.normalImage)
+        }
+      })
+      event.addListener(marker, 'click', () => {
+        if (selectedMyMarker && selectedMyMarker !== marker) {
+          const prev = selectedMyMarker as unknown as { normalImage?: unknown; setImage?: (img: unknown) => void }
+          if (prev.normalImage && prev.setImage) prev.setImage(prev.normalImage)
+        }
+        ;(marker as unknown as { setImage?: (img: unknown) => void }).setImage(myLocationImages.clickImage)
+        selectedMyMarker = marker
+        closeOverlay()
+        overlay.setMap(mapInstance)
+        currentOverlay = overlay
+      })
+    } else {
+      event.addListener(marker, 'click', () => {
+        closeOverlay()
+        overlay.setMap(mapInstance)
+        currentOverlay = overlay
+      })
+    }
+    markersRef.value.push(marker)
   })
+
+  if (pathGroups?.length && mapInstance) {
+    pathGroups.forEach((pathGroup) => {
+      if (pathGroup.length < 2) return
+      const path = pathGroup.map((p) => new LatLng(p.lat, p.lng))
+      const polyline = new Polyline({
+        map: mapInstance,
+        path,
+        strokeWeight: 3,
+        strokeColor: '#db4040',
+        strokeOpacity: 1,
+        strokeStyle: 'solid',
+      })
+      const overlays: ReturnType<Window['kakao']['maps']['CustomOverlay']>[] = []
+      path.forEach((position, i) => {
+        const circleOverlay = new CustomOverlay({
+          content: '<span class="dot"></span>',
+          position,
+          zIndex: 1,
+        })
+        circleOverlay.setMap(mapInstance)
+        overlays.push(circleOverlay)
+        if (i > 0 && i < path.length - 1) {
+          const segPath = path.slice(0, i + 1)
+          const segPoly = new Polyline({ path: segPath })
+          const distance = Math.round(segPoly.getLength())
+          const distanceOverlay = new CustomOverlay({
+            content: '<div class="dotOverlay">거리 <span class="number">' + distance + '</span>m</div>',
+            position,
+            yAnchor: 1,
+            zIndex: 2,
+          })
+          distanceOverlay.setMap(mapInstance)
+          overlays.push(distanceOverlay)
+        }
+      })
+      const totalDistance = Math.round(polyline.getLength())
+      const lastPos = path[path.length - 1]
+      const totalOverlay = new CustomOverlay({
+        content: getTimeHTML(totalDistance),
+        position: lastPos,
+        xAnchor: 0,
+        yAnchor: 0,
+        zIndex: 3,
+      })
+      totalOverlay.setMap(mapInstance)
+      overlays.push(totalOverlay)
+      pathOverlays.push({ polyline, overlays })
+    })
+  }
 
   if (typeof window !== 'undefined') {
     ;(window as unknown as { __closeKakaoOverlay?: () => void }).__closeKakaoOverlay = closeOverlay
@@ -217,6 +377,7 @@ async function loadLocationsAndDrawMap() {
   locationsLoading.value = true
   locationsLoadError.value = null
   locationsList.value = []
+  let pathGroups: { lat: number; lng: number }[][] = []
   let positions: {
     title: string
     lat: number
@@ -250,7 +411,6 @@ async function loadLocationsAndDrawMap() {
 
     const listForMarkers = list.filter((loc) => Number(loc.status) === 1)
     positions = listForMarkers.map((loc) => {
-      
       const messageText =
         (loc as { message?: string; content?: string }).message ??
         (loc as { message?: string; content?: string }).content ??
@@ -271,6 +431,23 @@ async function loadLocationsAndDrawMap() {
       }
     })
 
+    const groups = new Map<string, LocationResponse[]>()
+    listForMarkers.forEach((loc) => {
+      const key = (loc.sender ?? '').trim()
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(loc)
+    })
+    groups.forEach((arr) => {
+      arr.sort((a, b) => String(a.uploadDate).localeCompare(String(b.uploadDate)))
+      if (arr.length >= 2) {
+        pathGroups.push(arr.map((l) => ({ lat: toLat(l), lng: toLng(l) })))
+      }
+    })
+    if (pathGroups.length === 0 && listForMarkers.length >= 2) {
+      const sorted = [...listForMarkers].sort((a, b) => String(a.uploadDate).localeCompare(String(b.uploadDate)))
+      pathGroups.push(sorted.map((l) => ({ lat: toLat(l), lng: toLng(l) })))
+    }
+
     const myLat = location.value?.latitude
     const myLng = location.value?.longitude
     const isSameCoord = (p: { lat: number; lng: number }) =>
@@ -285,13 +462,13 @@ async function loadLocationsAndDrawMap() {
           lng: myLng,
           uploadDate: location.value ? formatDateTime(location.value.uploadDate) : '',
           isMyLocation: true,
+          bodySecondLine: `위도 ${myLat.toFixed(5)}, 경도 ${myLng.toFixed(5)}`,
           status: 1,
         },
         ...positions,
       ]
-    } else if (positions.length === 0) {
-      positions = []
     }
+
     console.log('[지도 마커] 그릴 마커 개수:', positions.length)
     console.log('[지도 마커] 그릴 마커 전체:', positions.map((p, i) => ({ index: i, title: p.title, lat: p.lat, lng: p.lng, uploadDate: p.uploadDate, isMyLocation: p.isMyLocation, bodySecondLine: p.bodySecondLine })))
   } catch (e) {
@@ -299,7 +476,7 @@ async function loadLocationsAndDrawMap() {
   }
 
   try {
-    drawKakaoMap(positions, location.value ?? undefined)
+    drawKakaoMap(positions, location.value ?? undefined, pathGroups)
   } catch (e) {
     locationsLoadError.value = e instanceof Error ? e.message : '지도를 그리는 중 오류가 발생했습니다.'
   } finally {
@@ -340,6 +517,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   closeOverlay()
+  pathOverlays.forEach(({ polyline, overlays }) => {
+    polyline.setMap(null)
+    overlays.forEach((o) => o.setMap(null))
+  })
+  pathOverlays = []
   markersRef.value = []
   mapInstance = null
 })
@@ -584,6 +766,56 @@ async function onRefreshLocation() {
   width: 22px;
   height: 12px;
   background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/vertex_white.png');
+}
+.dot {
+  overflow: hidden;
+  float: left;
+  width: 12px;
+  height: 12px;
+  background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/mini_circle.png');
+}
+.dotOverlay {
+  position: relative;
+  bottom: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  border-bottom: 2px solid #ddd;
+  float: left;
+  font-size: 12px;
+  padding: 5px;
+  background: #fff;
+}
+.dotOverlay:nth-of-type(n) {
+  border: 0;
+  box-shadow: 0 1px 2px #888;
+}
+.dotOverlay .number {
+  font-weight: bold;
+  color: #ee6152;
+}
+.dotOverlay:after {
+  content: '';
+  position: absolute;
+  margin-left: -6px;
+  left: 50%;
+  bottom: -8px;
+  width: 11px;
+  height: 8px;
+  background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/vertex_white_small.png');
+}
+.distanceInfo {
+  position: relative;
+  top: 5px;
+  left: 5px;
+  list-style: none;
+  margin: 0;
+}
+.distanceInfo .label {
+  display: inline-block;
+  width: 50px;
+}
+.distanceInfo:after {
+  content: none;
 }
 </style>
 
