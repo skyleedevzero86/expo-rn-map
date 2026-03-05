@@ -24,6 +24,8 @@ class WebConfig {
             addAllowedOriginPattern("http://0.0.0.0:*")
             addAllowedOriginPattern("exp://*")
             addAllowedOriginPattern("exp://127.0.0.1:*")
+            addAllowedOriginPattern("http://192.168.*.*:*")
+            addAllowedOriginPattern("http://10.*.*.*:*")
             val origins = allowedOriginsConfig.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             origins.forEach { addAllowedOrigin(it) }
             addAllowedHeader("*")
