@@ -3,6 +3,7 @@
     "name": "위치 추적",
     "slug": "location-tracking-app",
     "version": "1.0.0",
+    "newArchEnabled": true,
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -21,6 +22,7 @@
       }
     },
     "android": {
+      "package": "com.locationtracking.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -36,13 +38,7 @@
     },
     "plugins": [
       "expo-location",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/notification-icon.png",
-          "color": "#ffffff"
-        }
-      ]
-    }
+      ["expo-notifications", {"icon": "./assets/notification-icon.png", "color": "#ffffff"}]
+    ]
   }
 }
