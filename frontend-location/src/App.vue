@@ -115,15 +115,15 @@ async function onRefreshLocation() {
   <div class="app">
     <p v-if="showBackendUnreachableBanner" class="error banner">{{ BACKEND_UNREACHABLE_MSG }}</p>
     <h1>현재 위치 (카카오맵)</h1>
-    <p class="hint">아래 버튼으로 위치를 갱신하면 최신 위치가 저장되고, 읽지 않은 메시지를 받아옵니다. 지도에서 마커를 클릭하면 상세 정보가 뜨고, 닫기로 숨길 수 있습니다.</p>
+    <p class="hint">DB에 저장하는 것은 <strong>위치 갱신</strong>뿐입니다. 최신 위치 불러오기·지도 마커 새로고침은 DB에 저장하지 않고 읽기만 합니다. 지도에서 마커를 클릭하면 상세 정보가 뜨고, 닫기로 숨길 수 있습니다.</p>
     <button type="button" class="btn" :disabled="locationLoading" @click="onRefreshLocation">
-      위치 갱신
+      위치 갱신 (DB 저장)
     </button>
     <button type="button" class="btn secondary" :disabled="locationLoading" @click="fetchLocation">
-      최신 위치 불러오기
+      최신 위치 불러오기 (저장 안 함)
     </button>
     <button type="button" class="btn secondary" :disabled="locationsLoading" @click="loadLocationsAndDrawMap">
-      지도 마커 새로고침
+      지도 마커 새로고침 (저장 안 함)
     </button>
     <p v-if="locationError && !isBackendUnreachable(locationError)" class="error">{{ locationError }}</p>
     <p
