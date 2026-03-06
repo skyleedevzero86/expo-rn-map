@@ -3,5 +3,6 @@ import type { Messages } from '@domain/entities/Messages';
 
 export interface IMessageApi {
   uploadLocationAndGetMessages(coords: Coordinates): Promise<Messages>;
+  getUnreadMessages(): Promise<Messages>;
   markMessageAsRead(no: number): Promise<void>;
 }

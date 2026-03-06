@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { useLocationTracking } from '../hooks/useLocationTracking';
+import { useUnreadMessagePolling } from '../hooks/useUnreadMessagePolling';
 
 declare const process: { env?: { EXPO_PUBLIC_API_BASE_URL?: string } };
 
@@ -26,6 +27,7 @@ function getApiHint(connectionOk: boolean | null): string {
 }
 
 export function HomeScreen() {
+  useUnreadMessagePolling();
   const { status, error, start, stop } = useLocationTracking();
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   const [testing, setTesting] = useState(false);
@@ -43,7 +45,15 @@ export function HomeScreen() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
-      const res = await fetch(`${base}/api/health`, { method: 'GET', signal: controller.signal });
+      const headers: Record<string, string> = {};
+      if (base.includes('ngrok-free.app') || base.includes('ngrok.io')) {
+        headers['ngrok-skip-browser-warning'] = 'true';
+      }
+      const res = await fetch(`${base}/api/health`, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      });
       clearTimeout(timeoutId);
       if (res.ok) {
         setConnectionOk(true);
@@ -114,9 +124,12 @@ export function HomeScreen() {
         <Text style={styles.hint}>위치 추적 시작 중...</Text>
       )}
       {status === 'active' && (
-        <Text style={styles.hint}>위치 추적 중. 웹에서 보낸 메시지는 팝업으로 표시됩니다.</Text>
+        <Text style={styles.hint}>위치 추적 중.</Text>
       )}
-      <Text style={styles.footHint}>Expo Go에서는 알림 배너 제한. 전체 알림은 npx expo run:android (개발 빌드) 사용.</Text>
+      <Text style={styles.hint}>웹에서 보낸 메시지는 약 15초 간격으로 확인 후 팝업으로 표시됩니다.</Text>
+      <Text style={styles.footHint}>
+        Expo Go에서는 알림 배너 제한. 전체 알림은 npx expo run:android (개발 빌드) 사용.
+      </Text>
     </View>
   );
 }

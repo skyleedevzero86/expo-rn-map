@@ -26,6 +26,8 @@ class WebConfig {
             addAllowedOriginPattern("exp://127.0.0.1:*")
             addAllowedOriginPattern("http://192.168.*.*:*")
             addAllowedOriginPattern("http://10.*.*.*:*")
+            addAllowedOriginPattern("https://*.ngrok-free.app")
+            addAllowedOriginPattern("https://*.ngrok.io")
             val origins = allowedOriginsConfig.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             origins.forEach { addAllowedOrigin(it) }
             addAllowedHeader("*")

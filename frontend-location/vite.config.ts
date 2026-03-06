@@ -6,7 +6,10 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, __dirname, '')
+  const rootDir = path.resolve(__dirname, '../..')
+  const rootEnv = loadEnv(mode, rootDir, '')
+  const localEnv = loadEnv(mode, __dirname, '')
+  const env = { ...rootEnv, ...localEnv }
   const kakaoKey = env.VITE_KAKAO_MAP_KEY ?? ''
   return {
   plugins: [

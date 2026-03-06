@@ -13,6 +13,38 @@ function getApiBaseUrl(): string {
   return 'http://localhost:8080';
 }
 
+function apiHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const h: Record<string, string> = { 'X-Source': 'mobile', ...extra };
+  const base = getApiBaseUrl();
+  if (base.includes('ngrok-free.app') || base.includes('ngrok.io')) {
+    h['ngrok-skip-browser-warning'] = 'true';
+  }
+  return h;
+}
+
+function isHtmlResponse(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  return t.startsWith('<!doctype') || t.startsWith('<html');
+}
+
+function toUserFriendlyError(body: string, status: number, fallback: string): string {
+  if (!body || !body.trim()) return fallback;
+  if (isHtmlResponse(body)) {
+    const base = getApiBaseUrl();
+    if (base.includes('ngrok-free.app') || base.includes('ngrok.io')) {
+      return '서버가 예상한 응답이 아닙니다. .env의 EXPO_PUBLIC_API_BASE_URL이 터널 주소와 같은지 확인한 뒤, 앱을 완전히 종료했다가 다시 실행해 주세요.';
+    }
+    return '서버가 HTML을 반환했습니다. 연결 주소와 백엔드 실행 여부를 확인해 주세요.';
+  }
+  try {
+    const j = JSON.parse(body) as { details?: unknown };
+    if (j.details != null && typeof j.details === 'string') return j.details;
+  } catch {
+  }
+  if (body.length > 200) return body.slice(0, 200);
+  return body;
+}
+
 interface MessageResponseItem {
   no: number;
   sender: string;
@@ -37,10 +69,7 @@ export function createMessageApiAdapter(): IMessageApi {
       try {
         res = await fetch(url, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Source': 'mobile',
-          },
+          headers: apiHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             latitude: coords.latitude,
             longitude: coords.longitude,
@@ -85,13 +114,7 @@ export function createMessageApiAdapter(): IMessageApi {
       }
 
       if (!res.ok) {
-        let message = `API 오류 ${res.status}`;
-        try {
-          const json = JSON.parse(text) as { details?: unknown };
-          if (json.details != null) message = String(json.details);
-        } catch {
-          if (text) message = text.slice(0, 200);
-        }
+        const message = toUserFriendlyError(text, res.status, `API 오류 ${res.status}`);
         throw new Error(message);
       }
 
@@ -99,6 +122,41 @@ export function createMessageApiAdapter(): IMessageApi {
       try {
         data = JSON.parse(text) as MessagesApiResponse;
       } catch {
+        if (isHtmlResponse(text)) {
+          throw new Error(
+            '서버가 HTML을 반환했습니다. ngrok 사용 시 앱을 완전히 종료한 뒤 다시 실행하고, 터널 주소가 .env와 일치하는지 확인해 주세요.'
+          );
+        }
+        throw new Error('응답을 읽을 수 없습니다.');
+      }
+      const list = Array.isArray(data?.message) ? data.message : [];
+      const messages = list.map((item: MessageResponseItem) =>
+        createMessage({
+          no: item.no,
+          sender: item.sender ?? '',
+          message: item.message ?? '',
+          sendDate: typeof item.sendDate === 'string' ? item.sendDate : String(item.sendDate ?? ''),
+          status: typeof item.status === 'number' ? item.status : 0,
+        })
+      );
+      return createMessages({ message: messages });
+    },
+
+    async getUnreadMessages(): Promise<ReturnType<typeof createMessages>> {
+      const baseUrl = getApiBaseUrl();
+      const url = `${baseUrl}/api/messages/unread`;
+      const res = await fetch(url, { headers: apiHeaders() });
+      const textUnread = await res.text().catch(() => '');
+      if (!res.ok) {
+        throw new Error(toUserFriendlyError(textUnread, res.status, `미읽음 목록 조회 실패 ${res.status}`));
+      }
+      let data: MessagesApiResponse;
+      try {
+        data = JSON.parse(textUnread) as MessagesApiResponse;
+      } catch {
+        if (isHtmlResponse(textUnread)) {
+          throw new Error('서버가 HTML을 반환했습니다. ngrok 사용 시 앱을 재시작하고 .env 터널 주소를 확인해 주세요.');
+        }
         throw new Error('응답을 읽을 수 없습니다.');
       }
       const list = Array.isArray(data?.message) ? data.message : [];
@@ -119,11 +177,11 @@ export function createMessageApiAdapter(): IMessageApi {
       const url = `${baseUrl}/api/messages/read/${no}`;
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'X-Source': 'mobile' },
+        headers: apiHeaders(),
       });
       if (!res.ok) {
         const t = await res.text().catch(() => '');
-        throw new Error(t || `읽음 처리 실패 ${res.status}`);
+        throw new Error(toUserFriendlyError(t, res.status, `읽음 처리 실패 ${res.status}`));
       }
     },
   };

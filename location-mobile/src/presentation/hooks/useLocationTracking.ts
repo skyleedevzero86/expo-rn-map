@@ -1,30 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
-import { startLocationTracking, stopLocationTracking, getMessageApi } from '@application/composition/useCases';
-import type { Message } from '@domain/entities/Message';
+import { startLocationTracking, stopLocationTracking } from '@application/composition/useCases';
+import { showUnreadMessagesOneByOne } from '../utils/messageAlerts';
 
 type TrackingStatus = 'idle' | 'starting' | 'active' | 'stopping' | 'error';
-
-function formatMessage(msg: Message): string {
-  const sender = msg.sender?.trim() || '알 수 없음';
-  const body = msg.message?.trim() || '(내용 없음)';
-  return `${sender}: ${body}`;
-}
-
-function showNextMessage(list: Message[], index: number): void {
-  if (index >= list.length) return;
-  const msg = list[index];
-  const api = getMessageApi();
-  Alert.alert('새 메시지', formatMessage(msg), [
-    {
-      text: 'OK',
-      onPress: () => {
-        api.markMessageAsRead(msg.no).catch(() => {});
-        setTimeout(() => showNextMessage(list, index + 1), 0);
-      },
-    },
-  ]);
-}
 
 export function useLocationTracking() {
   const [status, setStatus] = useState<TrackingStatus>('idle');
@@ -42,16 +21,16 @@ export function useLocationTracking() {
         onUploadError: (err) => {
           if (uploadErrorSet.current) return;
           uploadErrorSet.current = true;
-          setError(err.message);
+          const msg = err.message.replace(/<[^>]*>/g, '').trim() || '서버 연결에 실패했습니다.';
+          setError(msg);
           if (!uploadErrorAlertShown.current) {
             uploadErrorAlertShown.current = true;
-            Alert.alert('위치 전송 실패', err.message);
+            Alert.alert('위치 전송 실패', msg);
           }
         },
         onMessagesReceived: (list) => {
-          const unreadOnly = (list ?? []).filter((m) => m.status === 0);
-          if (!unreadOnly.length) return;
-          showNextMessage(unreadOnly, 0);
+          if (!list?.length) return;
+          showUnreadMessagesOneByOne(Array.from(list));
         },
       });
       setStatus('active');

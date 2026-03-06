@@ -1,9 +1,11 @@
 package com.sleekydz86.location.interfaces.web
 
 import com.sleekydz86.location.application.message.GetMessagesPaginatedUseCase
+import com.sleekydz86.location.application.message.GetUnreadMessagesUseCase
 import com.sleekydz86.location.application.message.MarkMessageAsReadUseCase
 import com.sleekydz86.location.application.message.SendMessageUseCase
 import com.sleekydz86.location.interfaces.dto.MessageResponse
+import com.sleekydz86.location.interfaces.dto.MessagesResponse
 import com.sleekydz86.location.interfaces.dto.SendMessageRequest
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.annotation.Validated
@@ -19,9 +21,24 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api")
 class MessageController(
     private val getMessagesPaginatedUseCase: GetMessagesPaginatedUseCase,
+    private val getUnreadMessagesUseCase: GetUnreadMessagesUseCase,
     private val sendMessageUseCase: SendMessageUseCase,
     private val markMessageAsReadUseCase: MarkMessageAsReadUseCase
 ) {
+
+    @GetMapping("/messages/unread")
+    fun getUnreadMessages(): ResponseEntity<MessagesResponse> {
+        val list = getUnreadMessagesUseCase.execute().map { m ->
+            MessageResponse(
+                no = m.id,
+                sender = m.sender,
+                message = m.content,
+                sendDate = m.sentAt,
+                status = MessageResponse.statusToInt(m.status)
+            )
+        }
+        return ResponseEntity.ok(MessagesResponse(message = list))
+    }
 
     @GetMapping("/messages")
     fun getMessages(
