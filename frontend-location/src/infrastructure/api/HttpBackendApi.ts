@@ -82,7 +82,7 @@ export function createHttpBackendApi(): IBackendApi {
     postLocationAndGetMessages(latitude: number, longitude: number): Promise<MessagesResponse> {
       return request<MessagesResponse>('/message', {
         method: 'POST',
-        body: JSON.stringify({ latitude, longitude }),
+        body: JSON.stringify({ latitude, longitude, source: 'web' }),
       })
     },
 

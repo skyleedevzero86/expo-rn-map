@@ -16,13 +16,18 @@ create table if not exists location (
     no bigint primary key auto_increment comment 'PK, 자동 증가',
     latitude double not null comment '위도 (-90 ~ 90)',
     longitude double not null comment '경도 (-180 ~ 180)',
-    upload_date datetime not null comment '업로드 시각, 최근순 조회·인덱스 사용'
+    upload_date datetime not null comment '업로드 시각, 최근순 조회·인덱스 사용',
+    source varchar(20) null comment 'web | mobile — PC 갱신 vs 모바일 갱신'
 ) engine=InnoDB default charset=utf8mb4 comment '위치 좌표 저장 (동시 접속 대량 INSERT 대비)';
+
 
 -- 최근순 목록/지도 마커 조회용 (ORDER BY upload_date DESC LIMIT N)
 create index idx_location_upload_date on location (upload_date desc);
 -- 좌표 범위/지도 영역 조회용 (선택)
 create index idx_location_coords on location (latitude, longitude);
+
+-- 기존 DB에 source 컬럼 없을 때만 실행 (신규 설치 시 create table에 이미 있으면 주석 처리)
+ALTER TABLE location ADD COLUMN source varchar(20) NULL COMMENT 'web | mobile' AFTER upload_date;
 
 -- -----------------------------------------------------------------------------
 -- message: 메시지 (발신자, 본문, 발송 시각, 상태, 위치 FK)
@@ -49,27 +54,27 @@ create index idx_message_location_no on message (location_no);
 -- 더미 데이터 (개발/테스트용, 10만 명 시나리오 참고용)
 -- =============================================================================
 
-insert into location (latitude, longitude, upload_date) values
-                                                            (37.5665, 126.9780, date_sub(now(), interval 1 minute)),
-                                                            (37.5666, 126.9782, date_sub(now(), interval 2 minute)),
-                                                            (37.5667, 126.9784, date_sub(now(), interval 3 minute)),
-                                                            (37.5668, 126.9786, date_sub(now(), interval 5 minute)),
-                                                            (37.5670, 126.9790, date_sub(now(), interval 10 minute)),
-                                                            (37.5672, 126.9792, date_sub(now(), interval 15 minute)),
-                                                            (37.5675, 126.9795, date_sub(now(), interval 20 minute)),
-                                                            (37.5680, 126.9800, date_sub(now(), interval 30 minute)),
-                                                            (37.5685, 126.9805, date_sub(now(), interval 1 hour)),
-                                                            (37.5690, 126.9810, date_sub(now(), interval 2 hour)),
-                                                            (37.5700, 126.9820, date_sub(now(), interval 3 hour)),
-                                                            (37.5710, 126.9830, date_sub(now(), interval 6 hour)),
-                                                            (37.5720, 126.9840, date_sub(now(), interval 12 hour)),
-                                                            (37.5730, 126.9850, date_sub(now(), interval 1 day)),
-                                                            (37.5740, 126.9860, date_sub(now(), interval 2 day)),
-                                                            (37.5750, 126.9870, date_sub(now(), interval 3 day)),
-                                                            (37.5760, 126.9880, date_sub(now(), interval 5 day)),
-                                                            (37.5770, 126.9890, date_sub(now(), interval 7 day)),
-                                                            (37.5780, 126.9900, date_sub(now(), interval 14 day)),
-                                                            (37.5790, 126.9910, date_sub(now(), interval 30 day));
+insert into location (latitude, longitude, upload_date, source) values
+    (37.5665, 126.9780, date_sub(now(), interval 1 minute), 'web'),
+    (37.5666, 126.9782, date_sub(now(), interval 2 minute), 'web'),
+    (37.5667, 126.9784, date_sub(now(), interval 3 minute), 'web'),
+    (37.5668, 126.9786, date_sub(now(), interval 5 minute), 'web'),
+    (37.5670, 126.9790, date_sub(now(), interval 10 minute), 'web'),
+    (37.5672, 126.9792, date_sub(now(), interval 15 minute), 'web'),
+    (37.5675, 126.9795, date_sub(now(), interval 20 minute), 'web'),
+    (37.5680, 126.9800, date_sub(now(), interval 30 minute), 'web'),
+    (37.5685, 126.9805, date_sub(now(), interval 1 hour), 'web'),
+    (37.5690, 126.9810, date_sub(now(), interval 2 hour), 'web'),
+    (37.5700, 126.9820, date_sub(now(), interval 3 hour), 'web'),
+    (37.5710, 126.9830, date_sub(now(), interval 6 hour), 'web'),
+    (37.5720, 126.9840, date_sub(now(), interval 12 hour), 'web'),
+    (37.5730, 126.9850, date_sub(now(), interval 1 day), 'web'),
+    (37.5740, 126.9860, date_sub(now(), interval 2 day), 'web'),
+    (37.5750, 126.9870, date_sub(now(), interval 3 day), 'web'),
+    (37.5760, 126.9880, date_sub(now(), interval 5 day), 'web'),
+    (37.5770, 126.9890, date_sub(now(), interval 7 day), 'web'),
+    (37.5780, 126.9900, date_sub(now(), interval 14 day), 'web'),
+    (37.5790, 126.9910, date_sub(now(), interval 30 day), 'web');
 
 -- message.location_no ↔ location.no 로 조인 (예: 메시지가 발송된 위치)
 insert into message (sender, message, send_date, status, location_no) values

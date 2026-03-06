@@ -40,6 +40,7 @@ export function createMessageApiAdapter(): IMessageApi {
           body: JSON.stringify({
             latitude: coords.latitude,
             longitude: coords.longitude,
+            source: 'mobile',
           }),
         });
       } catch (e) {

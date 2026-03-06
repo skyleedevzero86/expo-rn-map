@@ -7,5 +7,5 @@ interface LocationRepositoryPort {
 
     fun findRecentWithLatestMessage(limit: Int): List<LocationWithMessage>
 
-    fun replaceCurrent(coordinates: Coordinates)
+    fun replaceCurrent(coordinates: Coordinates, source: String? = null)
 }

@@ -54,7 +54,8 @@ class LocationController(
                 "uploadDate" to loc.uploadedAt,
                 "sender" to loc.sender,
                 "message" to loc.message,
-                "status" to loc.status
+                "status" to loc.status,
+                "source" to (loc.source.takeIf { it.isNotBlank() } ?: "web")
             )
         }
         return ResponseEntity.ok(mapOf("locations" to list))
@@ -64,7 +65,7 @@ class LocationController(
     fun postLocationAndGetUnreadMessages(
         @Validated @RequestBody body: PostLocationRequest
     ): ResponseEntity<MessagesResponse> {
-        updateLocationUseCase.execute(body.latitude, body.longitude)
+        updateLocationUseCase.execute(body.latitude, body.longitude, body.source)
         val messages = getUnreadMessagesUseCase.execute()
         val list = messages.map { m ->
             MessageResponse(

@@ -8,7 +8,8 @@ import org.springframework.stereotype.Service
 class UpdateLocationUseCase(
     private val locationRepository: LocationRepositoryPort
 ) {
-    fun execute(latitude: Double, longitude: Double) {
-        locationRepository.replaceCurrent(Coordinates(latitude, longitude))
+    fun execute(latitude: Double, longitude: Double, source: String? = null) {
+        val src = source?.take(20)?.takeIf { it in listOf("web", "mobile") } ?: "web"
+        locationRepository.replaceCurrent(Coordinates(latitude, longitude), src)
     }
 }

@@ -36,17 +36,16 @@ class LocationRepositoryAdapter(
 
     override fun findRecentWithLatestMessage(limit: Int): List<LocationWithMessage> {
         val safeLimit = limit.coerceAtLeast(1).coerceAtMost(500)
-       
-        val sql = """
-            SELECT l.no, l.latitude, l.longitude, l.upload_date, latest.sender, latest.`message`, CAST(latest.status AS SIGNED)
+       val sql = """
+            SELECT l.no, l.latitude, l.longitude, l.upload_date, latest.sender, latest.`message`, CAST(latest.status AS SIGNED), COALESCE(l.source, 'web')
             FROM location l
-            INNER JOIN (
+            LEFT JOIN (
                 SELECT m.location_no, m.sender, m.`message`, m.status, m.send_date,
                     ROW_NUMBER() OVER (PARTITION BY m.location_no ORDER BY m.send_date DESC) AS rn
                 FROM message m
                 WHERE m.location_no IS NOT NULL
             ) latest ON latest.location_no = l.no AND latest.rn = 1
-            ORDER BY latest.send_date DESC
+            ORDER BY COALESCE(latest.send_date, l.upload_date) DESC
             LIMIT $safeLimit
             """
         @Suppress("UNCHECKED_CAST")
@@ -63,24 +62,27 @@ class LocationRepositoryAdapter(
             }
             val sender = (if (row.size > 4) row[4] else null)?.toString()?.takeIf { it.isNotBlank() }
             val message = (if (row.size > 5) row[5] else null)?.toString()?.takeIf { it.isNotBlank() }
-            val status = (if (row.size > 6) row[6] else null)?.let { (it as? Number)?.toInt() ?: 1 } ?: 1
+            val status = (if (row.size > 6) row[6] else null)?.let { (it as? Number)?.toInt() ?: 0 } ?: 0
+            val source = (if (row.size > 7) row[7] else null)?.toString()?.takeIf { it.isNotBlank() } ?: "web"
             LocationWithMessage(
                 id = no,
                 coordinates = Coordinates(lat, lng),
                 uploadedAt = uploadDate,
                 sender = sender,
                 message = message,
-                status = status
+                status = status,
+                source = source
             )
         }
     }
 
     @Transactional
-    override fun replaceCurrent(coordinates: Coordinates) {
+    override fun replaceCurrent(coordinates: Coordinates, source: String? = null) {
         jpaRepository.save(
             LocationJpaEntity(
                 latitude = coordinates.latitude,
-                longitude = coordinates.longitude
+                longitude = coordinates.longitude,
+                source = source?.take(20)?.takeIf { it in listOf("web", "mobile") } ?: "web"
             )
         )
     }

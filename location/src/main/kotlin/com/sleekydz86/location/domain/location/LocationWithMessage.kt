@@ -8,5 +8,6 @@ data class LocationWithMessage(
     val uploadedAt: Instant,
     val sender: String?,
     val message: String?,
-    val status: Int
+    val status: Int,
+    val source: String = "web" 
 )

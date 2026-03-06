@@ -50,7 +50,9 @@ export function useLocationsMap(
           'DB에 location이 없습니다. MySQL에서 location/src/main/resources/script.sql 의 location INSERT를 실행한 뒤 "지도 마커 새로고침"을 누르세요.'
       }
 
-      const listForMarkers = list.filter((loc) => Number(loc.status) === 1)
+      const listForMarkers = list.filter((loc) => Number(loc.status) === 0)
+      const sourceLabel = (src: string | null | undefined) =>
+        src === 'mobile' ? '[모바일] ' : src === 'web' ? '[PC] ' : ''
       positions = listForMarkers.map((loc) => {
         const messageText =
           (loc as { message?: string; content?: string }).message ??
@@ -58,9 +60,10 @@ export function useLocationsMap(
           ''
         const senderText = loc.sender ?? ''
         const hasAuthorMessage = senderText !== '' || messageText !== ''
-        const title = hasAuthorMessage
+        const baseTitle = hasAuthorMessage
           ? `작성자 ${senderText || '(알 수 없음)'} : ${messageText.length > 40 ? messageText.slice(0, 40) + '…' : messageText || '(메시지 없음)'}`
           : `위치 #${loc.no} · ${formatDateTime(loc.uploadDate)}`
+        const title = sourceLabel(loc.source) + baseTitle
         return {
           title,
           lat: toLat(loc),
@@ -68,8 +71,9 @@ export function useLocationsMap(
           uploadDate: formatDateTime(loc.uploadDate),
           isMyLocation: false,
           bodySecondLine: messageText !== '' ? messageText : undefined,
-          status: loc.status !== undefined && loc.status !== null ? Number(loc.status) : 1,
+          status: loc.status !== undefined && loc.status !== null ? Number(loc.status) : 0,
           sender: (loc.sender ?? '').trim(),
+          source: (loc as { source?: string }).source ?? 'web',
         }
       })
 
@@ -162,15 +166,18 @@ export function useLocationsMap(
       locationsLoadError.value = '지도 스크립트를 불러올 수 없습니다. .env에 키 설정 후 개발 서버를 재시작하세요.'
       return
     }
-    if (k.maps.load) {
-      k.maps.load(() => {
-        loadLocationsAndDrawMap()
-        if (location.value) fetchLocation()
-      })
-    } else {
+    const runLoad = () => {
       loadLocationsAndDrawMap()
       if (location.value) fetchLocation()
     }
+    if (k.maps.load) {
+      k.maps.load(runLoad)
+    } else {
+      runLoad()
+    }
+    const REFRESH_INTERVAL_MS = 20_000
+    const timer = setInterval(runLoad, REFRESH_INTERVAL_MS)
+    onUnmounted(() => clearInterval(timer))
   })
 
   onUnmounted(() => {

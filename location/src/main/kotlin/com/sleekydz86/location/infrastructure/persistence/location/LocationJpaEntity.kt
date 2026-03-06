@@ -22,5 +22,8 @@ class LocationJpaEntity(
     var longitude: Double = 0.0,
 
     @Column(name = "upload_date", nullable = false)
-    var uploadDate: Instant = Instant.now()
+    var uploadDate: Instant = Instant.now(),
+
+    @Column(name = "source", length = 20)
+    var source: String? = null 
 )

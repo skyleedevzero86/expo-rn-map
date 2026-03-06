@@ -6,6 +6,7 @@ export interface LocationResponse {
   sender?: string | null
   message?: string | null
   status?: number
+  source?: string | null
 }
 
 export interface LocationsResponse {
@@ -44,6 +45,7 @@ export interface MapPosition {
   bodySecondLine?: string
   status?: number
   sender?: string
+  source?: string
 }
 
 export type PathGroup = { lat: number; lng: number }[]
