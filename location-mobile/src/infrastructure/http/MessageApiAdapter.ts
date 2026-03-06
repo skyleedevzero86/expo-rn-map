@@ -52,13 +52,29 @@ export function createMessageApiAdapter(): IMessageApi {
       } catch (e) {
         clearTimeout(timeoutId);
         if (e instanceof Error && e.name === 'AbortError') {
-          throw new Error('서버 응답이 없습니다. 연결을 확인해 주세요.');
+          const base = getApiBaseUrl();
+          throw new Error(
+            '서버 응답이 없습니다(타임아웃). 확인: ① 백엔드(location 폴더에서 gradlew bootRun) 실행 중인지 ② PC와 휴대폰이 같은 Wi‑Fi인지 ③ PC 방화벽에서 8080 포트 허용인지 ④ .env의 EXPO_PUBLIC_API_BASE_URL이 PC 실제 IP인지(현재: ' +
+              base +
+              '). 주소 수정 후 앱을 완전히 재시작하세요.'
+          );
         }
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed') || msg.includes('ECONNREFUSED')) {
-          throw new Error('네트워크 연결을 확인해 주세요. 실기기에서는 .env의 EXPO_PUBLIC_API_BASE_URL을 PC IP(예: http://192.168.x.x:8080)로 설정하세요.');
+        const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+        const isNetworkFailed =
+          msg.indexOf('fetch') !== -1 ||
+          msg.indexOf('network') !== -1 ||
+          msg.indexOf('failed') !== -1 ||
+          msg.indexOf('econnrefused') !== -1 ||
+          msg.indexOf('request failed') !== -1;
+        if (isNetworkFailed) {
+          const base = getApiBaseUrl();
+          throw new Error(
+            '네트워크 연결 실패(Network request failed). ① PC와 휴대폰 같은 Wi‑Fi인지 ② .env의 EXPO_PUBLIC_API_BASE_URL이 PC IP인지(현재: ' +
+              base +
+              ') ③ app.config.js 수정 후 개발 빌드 다시 실행(npx expo run:android 또는 run:ios). 연결 주소 수정만 했으면 앱 완전 재시작.'
+          );
         }
-        throw new Error(`서버에 연결할 수 없습니다. ${msg}`);
+        throw new Error('서버에 연결할 수 없습니다. ' + (e instanceof Error ? e.message : String(e)));
       }
 
       let text: string;

@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.sql.Timestamp
 import java.time.Instant
 
 @Component
@@ -78,21 +79,15 @@ class LocationRepositoryAdapter(
 
     @Transactional
     override fun replaceCurrent(coordinates: Coordinates, source: String? = null) {
-        val src: String = source?.trim()?.take(20)?.takeIf { it in listOf("web", "mobile") } ?: "web"
-        try {
-            val entity = LocationJpaEntity(
-                no = 0,
-                latitude = coordinates.latitude,
-                longitude = coordinates.longitude,
-                uploadDate = Instant.now(),
-                source = src.ifBlank { "web" }
-            )
-            jpaRepository.save(entity)
-            log.info("[location] replaceCurrent 저장 완료: lat={}, lng={}, source={}", coordinates.latitude, coordinates.longitude, src)
-        } catch (e: Exception) {
-            log.error("[location] replaceCurrent 저장 실패: lat={}, lng={}, source={}", coordinates.latitude, coordinates.longitude, src, e)
-            throw e
-        }
+        val src = (source?.trim()?.lowercase()?.take(20)?.takeIf { it in listOf("web", "mobile") } ?: "web")
+        entityManager.createNativeQuery(
+            "INSERT INTO location (latitude, longitude, upload_date, source) VALUES (:lat, :lng, :ud, :src)"
+        ).setParameter("lat", coordinates.latitude)
+            .setParameter("lng", coordinates.longitude)
+            .setParameter("ud", Timestamp.from(Instant.now()))
+            .setParameter("src", src)
+            .executeUpdate()
+        log.info("[location] replaceCurrent 저장 완료: lat={}, lng={}, source={}", coordinates.latitude, coordinates.longitude, src)
     }
 }
 

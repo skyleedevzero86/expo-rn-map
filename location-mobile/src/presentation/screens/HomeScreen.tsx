@@ -6,15 +6,25 @@ declare const process: { env?: { EXPO_PUBLIC_API_BASE_URL?: string } };
 
 function getApiHint(): string {
   const url = process.env?.EXPO_PUBLIC_API_BASE_URL;
-  if (url && typeof url === 'string' && url.trim() !== '' && !url.includes('localhost')) {
+  if (url && typeof url === 'string' && url.trim() !== '' && url.indexOf('localhost') === -1) {
     return '서버 연결됨';
   }
   return '실기기: .env에 EXPO_PUBLIC_API_BASE_URL=http://PC IP:8080 설정 후 앱을 완전 종료했다가 다시 실행하세요. (핫 리로드만으로는 반영 안 됨)';
 }
 
+function getApiBaseDisplay(): string {
+  const url = process.env?.EXPO_PUBLIC_API_BASE_URL;
+  if (url && typeof url === 'string') {
+    const t = url.trim().replace(/\/+$/, '');
+    return t || 'http://localhost:8080';
+  }
+  return 'http://localhost:8080';
+}
+
 export function HomeScreen() {
   const { status, error, start, stop } = useLocationTracking();
   const apiHint = getApiHint();
+  const apiBase = getApiBaseDisplay();
 
   const handleStart = () => {
     start().catch((e) => {
@@ -35,6 +45,7 @@ export function HomeScreen() {
       <Text style={styles.title}>위치 추적</Text>
 
       <Text style={styles.apiHint}>{apiHint}</Text>
+      <Text style={styles.apiUrl}>연결 주소: {apiBase}</Text>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -80,6 +91,13 @@ const styles = StyleSheet.create({
   apiHint: {
     fontSize: 12,
     color: '#666',
+    marginBottom: 4,
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  apiUrl: {
+    fontSize: 11,
+    color: '#999',
     marginBottom: 16,
     textAlign: 'center',
     paddingHorizontal: 16,
