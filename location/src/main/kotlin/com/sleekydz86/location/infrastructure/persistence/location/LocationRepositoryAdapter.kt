@@ -78,13 +78,21 @@ class LocationRepositoryAdapter(
 
     @Transactional
     override fun replaceCurrent(coordinates: Coordinates, source: String? = null) {
-        jpaRepository.save(
-            LocationJpaEntity(
+        val src: String = source?.trim()?.take(20)?.takeIf { it in listOf("web", "mobile") } ?: "web"
+        try {
+            val entity = LocationJpaEntity(
+                no = 0,
                 latitude = coordinates.latitude,
                 longitude = coordinates.longitude,
-                source = source?.take(20)?.takeIf { it in listOf("web", "mobile") } ?: "web"
+                uploadDate = Instant.now(),
+                source = src.ifBlank { "web" }
             )
-        )
+            jpaRepository.save(entity)
+            log.info("[location] replaceCurrent 저장 완료: lat={}, lng={}, source={}", coordinates.latitude, coordinates.longitude, src)
+        } catch (e: Exception) {
+            log.error("[location] replaceCurrent 저장 실패: lat={}, lng={}, source={}", coordinates.latitude, coordinates.longitude, src, e)
+            throw e
+        }
     }
 }
 

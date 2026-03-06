@@ -50,7 +50,7 @@ export function useLocationsMap(
           'DB에 location이 없습니다. MySQL에서 location/src/main/resources/script.sql 의 location INSERT를 실행한 뒤 "지도 마커 새로고침"을 누르세요.'
       }
 
-      const listForMarkers = list.filter((loc) => Number(loc.status) === 0)
+      const listForMarkers = list
       const sourceLabel = (src: string | null | undefined) =>
         src === 'mobile' ? '[모바일] ' : src === 'web' ? '[PC] ' : ''
       positions = listForMarkers.map((loc) => {
@@ -75,6 +75,24 @@ export function useLocationsMap(
           sender: (loc.sender ?? '').trim(),
           source: (loc as { source?: string }).source ?? 'web',
         }
+      })
+      const samePosDelta = 0.00008
+      const key = (p: { lat: number; lng: number }) =>
+        `${Math.round(p.lat * 1e5)}_${Math.round(p.lng * 1e5)}`
+      const byKey = new Map<string, MapPosition[]>()
+      positions.forEach((p) => {
+        if (p.isMyLocation) return
+        const k = key(p)
+        if (!byKey.has(k)) byKey.set(k, [])
+        byKey.get(k)!.push(p)
+      })
+      byKey.forEach((group) => {
+        if (group.length <= 1) return
+        group.forEach((p, i) => {
+          if (i === 0) return
+          p.lat = p.lat + (i % 2 === 1 ? samePosDelta : 0)
+          p.lng = p.lng + (i % 2 === 0 ? samePosDelta : 0)
+        })
       })
 
       const groups = new Map<string, LocationResponse[]>()

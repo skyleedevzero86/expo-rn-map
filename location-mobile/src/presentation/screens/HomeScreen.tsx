@@ -2,8 +2,19 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { useLocationTracking } from '../hooks/useLocationTracking';
 
+declare const process: { env?: { EXPO_PUBLIC_API_BASE_URL?: string } };
+
+function getApiHint(): string {
+  const url = process.env?.EXPO_PUBLIC_API_BASE_URL;
+  if (url && typeof url === 'string' && url.trim() !== '' && !url.includes('localhost')) {
+    return '서버 연결됨';
+  }
+  return '실기기: .env에 EXPO_PUBLIC_API_BASE_URL=http://PC IP:8080 설정 후 앱을 완전 종료했다가 다시 실행하세요. (핫 리로드만으로는 반영 안 됨)';
+}
+
 export function HomeScreen() {
   const { status, error, start, stop } = useLocationTracking();
+  const apiHint = getApiHint();
 
   const handleStart = () => {
     start().catch((e) => {
@@ -23,6 +34,8 @@ export function HomeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>위치 추적</Text>
 
+      <Text style={styles.apiHint}>{apiHint}</Text>
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Pressable
@@ -41,6 +54,9 @@ export function HomeScreen() {
         <Text style={styles.buttonText}>위치 추적 서비스 종료</Text>
       </Pressable>
 
+      {status === 'starting' && (
+        <Text style={styles.hint}>위치 추적 시작 중...</Text>
+      )}
       {status === 'active' && (
         <Text style={styles.hint}>위치 추적 중입니다. 메시지는 알림으로 표시됩니다.</Text>
       )}
@@ -60,6 +76,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 24,
     textAlign: 'center',
+  },
+  apiHint: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 16,
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
   error: {
     color: '#c00',

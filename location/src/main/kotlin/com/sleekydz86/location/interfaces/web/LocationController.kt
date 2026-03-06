@@ -13,9 +13,11 @@ import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.slf4j.LoggerFactory
 
 @RestController
 @RequestMapping("/api")
@@ -25,6 +27,7 @@ class LocationController(
     private val updateLocationUseCase: UpdateLocationUseCase,
     private val getUnreadMessagesUseCase: GetUnreadMessagesUseCase
 ) {
+    private val log = LoggerFactory.getLogger(LocationController::class.java)
 
     @GetMapping("/mylocation")
     fun getMyLocation(): ResponseEntity<*> {
@@ -63,9 +66,13 @@ class LocationController(
 
     @PostMapping("/message")
     fun postLocationAndGetUnreadMessages(
-        @Validated @RequestBody body: PostLocationRequest
+        @Validated @RequestBody body: PostLocationRequest,
+        @RequestHeader(name = "X-Source", required = false) sourceHeader: String?
     ): ResponseEntity<MessagesResponse> {
-        updateLocationUseCase.execute(body.latitude, body.longitude, body.source)
+        val rawSource = sourceHeader ?: body.source
+        val source = rawSource?.trim()?.lowercase()?.takeIf { it in listOf("web", "mobile") } ?: "web"
+        log.info("[POST /api/message] X-Source={}, body.source={}, 사용 source={}", sourceHeader, body.source, source)
+        updateLocationUseCase.execute(body.latitude, body.longitude, source)
         val messages = getUnreadMessagesUseCase.execute()
         val list = messages.map { m ->
             MessageResponse(

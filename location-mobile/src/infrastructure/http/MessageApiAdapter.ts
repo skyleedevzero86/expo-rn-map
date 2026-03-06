@@ -30,29 +30,45 @@ export function createMessageApiAdapter(): IMessageApi {
     async uploadLocationAndGetMessages(coords: Coordinates): Promise<ReturnType<typeof createMessages>> {
       const baseUrl = getApiBaseUrl();
       const url = `${baseUrl}/api/message`;
+      const timeoutMs = 15000;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       let res: Response;
       try {
         res = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-Source': 'mobile',
           },
           body: JSON.stringify({
             latitude: coords.latitude,
             longitude: coords.longitude,
             source: 'mobile',
           }),
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed')) {
-          throw new Error('네트워크 연결을 확인해 주세요.');
+        clearTimeout(timeoutId);
+        if (e instanceof Error && e.name === 'AbortError') {
+          throw new Error('서버 응답이 없습니다. 연결을 확인해 주세요.');
         }
-        throw new Error('서버에 연결할 수 없습니다.');
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed') || msg.includes('ECONNREFUSED')) {
+          throw new Error('네트워크 연결을 확인해 주세요. 실기기에서는 .env의 EXPO_PUBLIC_API_BASE_URL을 PC IP(예: http://192.168.x.x:8080)로 설정하세요.');
+        }
+        throw new Error(`서버에 연결할 수 없습니다. ${msg}`);
+      }
+
+      let text: string;
+      try {
+        text = await res.text();
+      } catch (e) {
+        throw new Error('응답 본문을 읽을 수 없습니다.');
       }
 
       if (!res.ok) {
-        const text = await res.text();
         let message = `API 오류 ${res.status}`;
         try {
           const json = JSON.parse(text) as { details?: unknown };
@@ -65,7 +81,7 @@ export function createMessageApiAdapter(): IMessageApi {
 
       let data: MessagesApiResponse;
       try {
-        data = (await res.json()) as MessagesApiResponse;
+        data = JSON.parse(text) as MessagesApiResponse;
       } catch {
         throw new Error('응답을 읽을 수 없습니다.');
       }

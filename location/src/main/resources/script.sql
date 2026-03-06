@@ -17,9 +17,8 @@ create table if not exists location (
     latitude double not null comment '위도 (-90 ~ 90)',
     longitude double not null comment '경도 (-180 ~ 180)',
     upload_date datetime not null comment '업로드 시각, 최근순 조회·인덱스 사용',
-    source varchar(20) null comment 'web | mobile — PC 갱신 vs 모바일 갱신'
+    source varchar(20) null default 'web' comment 'web | mobile — PC 갱신 vs 모바일 갱신'
 ) engine=InnoDB default charset=utf8mb4 comment '위치 좌표 저장 (동시 접속 대량 INSERT 대비)';
-
 
 -- 최근순 목록/지도 마커 조회용 (ORDER BY upload_date DESC LIMIT N)
 create index idx_location_upload_date on location (upload_date desc);
@@ -27,7 +26,10 @@ create index idx_location_upload_date on location (upload_date desc);
 create index idx_location_coords on location (latitude, longitude);
 
 -- 기존 DB에 source 컬럼 없을 때만 실행 (신규 설치 시 create table에 이미 있으면 주석 처리)
-ALTER TABLE location ADD COLUMN source varchar(20) NULL COMMENT 'web | mobile' AFTER upload_date;
+-- source 컬럼이 없으면 추가 (기존 DB 마이그레이션)
+ALTER TABLE location ADD COLUMN source varchar(20) NULL DEFAULT 'web' COMMENT 'web | mobile' AFTER upload_date;
+-- 이미 있으면 기본값만 맞추기 (선택)
+-- ALTER TABLE location MODIFY COLUMN source varchar(20) NULL DEFAULT 'web' COMMENT 'web | mobile';
 
 -- -----------------------------------------------------------------------------
 -- message: 메시지 (발신자, 본문, 발송 시각, 상태, 위치 FK)

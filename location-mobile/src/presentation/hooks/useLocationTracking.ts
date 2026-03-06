@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { Alert } from 'react-native';
 import { startLocationTracking, stopLocationTracking } from '@application/composition/useCases';
 
 type TrackingStatus = 'idle' | 'starting' | 'active' | 'stopping' | 'error';
@@ -11,7 +12,12 @@ export function useLocationTracking() {
     setError(null);
     setStatus('starting');
     try {
-      await startLocationTracking();
+      await startLocationTracking({
+        onUploadError: (err) => {
+          setError(err.message);
+          Alert.alert('위치 전송 실패', err.message);
+        },
+      });
       setStatus('active');
     } catch (e) {
       const message = e instanceof Error ? e.message : '시작할 수 없습니다.';

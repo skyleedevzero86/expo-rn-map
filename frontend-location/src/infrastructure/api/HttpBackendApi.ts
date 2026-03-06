@@ -35,15 +35,11 @@ function parseErrorBody(body: unknown, status: number): string {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const url = path.startsWith('/') ? `${BASE}${path}` : `${BASE}/${path}`
+  const headers = new Headers(init?.headers)
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   let res: Response
   try {
-    res = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...init?.headers,
-      },
-      ...init,
-    })
+    res = await fetch(url, { ...init, headers })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed') || msg.includes('ECONNREFUSED') || msg.includes('refused')) {
@@ -82,6 +78,7 @@ export function createHttpBackendApi(): IBackendApi {
     postLocationAndGetMessages(latitude: number, longitude: number): Promise<MessagesResponse> {
       return request<MessagesResponse>('/message', {
         method: 'POST',
+        headers: { 'X-Source': 'web' },
         body: JSON.stringify({ latitude, longitude, source: 'web' }),
       })
     },

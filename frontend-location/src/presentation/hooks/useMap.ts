@@ -90,7 +90,8 @@ export function useMap(selectedSender: Ref<string | null>) {
     closeOverlay()
 
     const myLocationImages = createMyLocationMarkerImages(kakao)
-    const dbMarkerImage = createSpriteMarkerImage(kakao, 1)
+    const webMarkerImage = createSpriteMarkerImage(kakao, 0)
+    const mobileMarkerImage = createSpriteMarkerImage(kakao, 2)
     const highlightedMarkerImage = createRedMarkerImage(kakao)
 
     positions.forEach((pos) => {
@@ -98,7 +99,13 @@ export function useMap(selectedSender: Ref<string | null>) {
       const isMy = !!pos.isMyLocation
       const isHighlighted =
         !isMy && senderHighlight !== '' && (pos.sender ?? '').trim() === senderHighlight
-      const image = isMy ? myLocationImages.normalImage : isHighlighted ? highlightedMarkerImage : dbMarkerImage
+      const image = isMy
+        ? myLocationImages.normalImage
+        : isHighlighted
+          ? highlightedMarkerImage
+          : pos.source === 'mobile'
+            ? mobileMarkerImage
+            : webMarkerImage
       const marker = new Marker({
         map: mapInstance,
         position: latlng,
