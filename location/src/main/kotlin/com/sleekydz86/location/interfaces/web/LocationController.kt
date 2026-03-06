@@ -29,6 +29,10 @@ class LocationController(
 ) {
     private val log = LoggerFactory.getLogger(LocationController::class.java)
 
+    @GetMapping("/health")
+    fun health(): ResponseEntity<Map<String, String>> =
+        ResponseEntity.ok(mapOf("status" to "ok"))
+
     @GetMapping("/mylocation")
     fun getMyLocation(): ResponseEntity<*> {
         val location = getCurrentLocationUseCase.execute()

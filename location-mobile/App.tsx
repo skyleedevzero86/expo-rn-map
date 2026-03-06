@@ -12,16 +12,20 @@ export default function App() {
     const sub = AppState.addEventListener('change', (next) => {
       appState.current = next;
     });
-    const notifSub = Notifications.addNotificationReceivedListener((notification) => {
-      const title = notification.request.content.title ?? '알림';
-      const body = notification.request.content.body ?? '';
-      if (appState.current === 'active' && (title || body)) {
-        Alert.alert(title, body || ' ');
-      }
-    });
+    let notifSub: { remove: () => void } | null = null;
+    try {
+      notifSub = Notifications.addNotificationReceivedListener((notification) => {
+        const title = notification.request.content.title ?? '알림';
+        const body = notification.request.content.body ?? '';
+        if (appState.current === 'active' && (title || body)) {
+          Alert.alert(title, body || ' ');
+        }
+      });
+    } catch {
+    }
     return () => {
       sub.remove();
-      notifSub.remove();
+      notifSub?.remove();
     };
   }, []);
 

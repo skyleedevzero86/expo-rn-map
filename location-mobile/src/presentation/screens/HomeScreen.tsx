@@ -1,16 +1,8 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { useLocationTracking } from '../hooks/useLocationTracking';
 
 declare const process: { env?: { EXPO_PUBLIC_API_BASE_URL?: string } };
-
-function getApiHint(): string {
-  const url = process.env?.EXPO_PUBLIC_API_BASE_URL;
-  if (url && typeof url === 'string' && url.trim() !== '' && url.indexOf('localhost') === -1) {
-    return '서버 연결됨';
-  }
-  return '실기기: .env에 EXPO_PUBLIC_API_BASE_URL=http://PC IP:8080 설정 후 앱을 완전 종료했다가 다시 실행하세요. (핫 리로드만으로는 반영 안 됨)';
-}
 
 function getApiBaseDisplay(): string {
   const url = process.env?.EXPO_PUBLIC_API_BASE_URL;
@@ -21,10 +13,55 @@ function getApiBaseDisplay(): string {
   return 'http://localhost:8080';
 }
 
+function getApiHint(connectionOk: boolean | null): string {
+  const base = getApiBaseDisplay();
+  if (base.indexOf('localhost') !== -1) {
+    return '실기기: .env에 EXPO_PUBLIC_API_BASE_URL=http://PC IP:8080 설정 후 앱 재시작.';
+  }
+  if (connectionOk === true) return '서버 연결됨';
+  if (connectionOk === false) return '연결 실패. start:tunnel 쓰는 중이면 pnpm run tunnel:api 후 .env에 https 주소 넣기.';
+  const isLan = base.startsWith('http://192.168.') || base.startsWith('http://10.');
+  if (isLan) return 'start:tunnel로 앱 열었으면 API도 터널 필요 → tunnel:api 후 .env에 https 넣기.';
+  return '아래 연결 테스트로 확인.';
+}
+
 export function HomeScreen() {
   const { status, error, start, stop } = useLocationTracking();
-  const apiHint = getApiHint();
+  const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
+  const [testing, setTesting] = useState(false);
+  const apiHint = getApiHint(connectionOk);
   const apiBase = getApiBaseDisplay();
+
+  const testConnection = useCallback(async () => {
+    const base = getApiBaseDisplay();
+    if (base.indexOf('localhost') !== -1) {
+      Alert.alert('연결 테스트', '실기기: .env에 EXPO_PUBLIC_API_BASE_URL=http://PC IP:8080 설정 후 앱 재시작.');
+      return;
+    }
+    setTesting(true);
+    setConnectionOk(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(`${base}/api/health`, { method: 'GET', signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        setConnectionOk(true);
+      } else {
+        setConnectionOk(false);
+      }
+    } catch (e) {
+      clearTimeout(timeoutId);
+      setConnectionOk(false);
+      const msg = e instanceof Error ? e.message : String(e);
+      Alert.alert(
+        '연결 실패',
+        `지금 start:tunnel로 앱 띄웠으면 192.168.x.x는 휴대폰에서 접속 불가.\n\n해결: 터미널에서 "pnpm run tunnel:api" 실행 → 나온 https://xxx.ngrok.io 를 .env에 EXPO_PUBLIC_API_BASE_URL=https://xxx.ngrok.io 로 넣고 → 앱 완전 종료 후 다시 실행.\n\n${msg}`
+      );
+    } finally {
+      setTesting(false);
+    }
+  }, []);
 
   const handleStart = () => {
     start().catch((e) => {
@@ -46,6 +83,14 @@ export function HomeScreen() {
 
       <Text style={styles.apiHint}>{apiHint}</Text>
       <Text style={styles.apiUrl}>연결 주소: {apiBase}</Text>
+
+      <Pressable
+        style={[styles.button, styles.buttonSecondary, testing && styles.buttonDisabled]}
+        onPress={testConnection}
+        disabled={testing}
+      >
+        <Text style={styles.buttonText}>{testing ? '연결 확인 중...' : '연결 테스트'}</Text>
+      </Pressable>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -69,8 +114,9 @@ export function HomeScreen() {
         <Text style={styles.hint}>위치 추적 시작 중...</Text>
       )}
       {status === 'active' && (
-        <Text style={styles.hint}>위치 추적 중입니다. 메시지는 알림으로 표시됩니다.</Text>
+        <Text style={styles.hint}>위치 추적 중. 웹에서 보낸 메시지는 팝업으로 표시됩니다.</Text>
       )}
+      <Text style={styles.footHint}>Expo Go에서는 알림 배너 제한. 전체 알림은 npx expo run:android (개발 빌드) 사용.</Text>
     </View>
   );
 }
@@ -113,6 +159,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 12,
   },
+  buttonSecondary: {
+    backgroundColor: '#5856D6',
+  },
   buttonStop: {
     backgroundColor: '#FF3B30',
   },
@@ -129,5 +178,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  footHint: {
+    marginTop: 24,
+    fontSize: 11,
+    color: '#999',
+    textAlign: 'center',
+    paddingHorizontal: 16,
   },
 });

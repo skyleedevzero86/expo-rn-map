@@ -78,14 +78,14 @@ class LocationRepositoryAdapter(
     }
 
     @Transactional
-    override fun replaceCurrent(coordinates: Coordinates, source: String? = null) {
+    override fun replaceCurrent(coordinates: Coordinates, source: String?) {
         val src = (source?.trim()?.lowercase()?.take(20)?.takeIf { it in listOf("web", "mobile") } ?: "web")
         entityManager.createNativeQuery(
-            "INSERT INTO location (latitude, longitude, upload_date, source) VALUES (:lat, :lng, :ud, :src)"
-        ).setParameter("lat", coordinates.latitude)
-            .setParameter("lng", coordinates.longitude)
-            .setParameter("ud", Timestamp.from(Instant.now()))
-            .setParameter("src", src)
+            "INSERT INTO location (latitude, longitude, upload_date, source) VALUES (?1, ?2, ?3, ?4)"
+        ).setParameter(1, coordinates.latitude)
+            .setParameter(2, coordinates.longitude)
+            .setParameter(3, Timestamp.from(Instant.now()))
+            .setParameter(4, src)
             .executeUpdate()
         log.info("[location] replaceCurrent 저장 완료: lat={}, lng={}, source={}", coordinates.latitude, coordinates.longitude, src)
     }

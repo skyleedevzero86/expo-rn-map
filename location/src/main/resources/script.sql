@@ -31,6 +31,8 @@ ALTER TABLE location ADD COLUMN source varchar(20) NULL DEFAULT 'web' COMMENT 'w
 -- 이미 있으면 기본값만 맞추기 (선택)
 -- ALTER TABLE location MODIFY COLUMN source varchar(20) NULL DEFAULT 'web' COMMENT 'web | mobile';
 
+UPDATE location SET source = 'web' WHERE source IS NULL;
+
 -- -----------------------------------------------------------------------------
 -- message: 메시지 (발신자, 본문, 발송 시각, 상태, 위치 FK)
 -- location_no로 location 테이블과 조인 → "이 메시지를 보낸 위치"

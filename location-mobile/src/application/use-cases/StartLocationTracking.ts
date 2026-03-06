@@ -1,10 +1,11 @@
 import type { ILocationService } from '../ports/ILocationService';
 import type { IMessageApi } from '../ports/IMessageApi';
 import type { INotificationService } from '../ports/INotificationService';
+import type { Message } from '@domain/entities/Message';
 
 export interface StartLocationTrackingOptions {
-
   onUploadError?: (error: Error) => void;
+  onMessagesReceived?: (messages: readonly Message[]) => void;
 }
 
 function toError(value: unknown): Error {
@@ -22,19 +23,13 @@ export function createStartLocationTracking(
 ) {
   return async function startLocationTracking(options?: StartLocationTrackingOptions): Promise<void> {
     const onUploadError = options?.onUploadError;
+    const onMessagesReceived = options?.onMessagesReceived;
 
-  
-    let granted: boolean;
+    let notificationsGranted = false;
     try {
-      granted = await notificationService.requestPermission();
-    } catch (e) {
-      const err = toError(e);
-      throw new Error(`알림 권한 요청 실패: ${err.message}`);
+      notificationsGranted = await notificationService.requestPermission();
+    } catch {
     }
-    if (!granted) {
-      throw new Error('알림 권한이 필요합니다. 설정에서 알림을 허용해 주세요.');
-    }
-
 
     try {
       await locationService.startWatching(async (coords) => {
@@ -48,16 +43,12 @@ export function createStartLocationTracking(
         }
         if (!messages?.message?.length) return;
 
-        
-        let notificationErrorReported = false;
+        onMessagesReceived?.(messages.message);
+
         for (const message of messages.message) {
           try {
-            await notificationService.showMessageNotification(message);
-          } catch (e) {
-            if (!notificationErrorReported) {
-              notificationErrorReported = true;
-              onUploadError?.(new Error('메시지 알림 표시에 실패했습니다.'));
-            }
+            if (notificationsGranted) await notificationService.showMessageNotification(message);
+          } catch {
           }
         }
       });

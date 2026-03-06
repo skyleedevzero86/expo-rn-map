@@ -53,11 +53,11 @@ export function createMessageApiAdapter(): IMessageApi {
         clearTimeout(timeoutId);
         if (e instanceof Error && e.name === 'AbortError') {
           const base = getApiBaseUrl();
-          throw new Error(
-            '서버 응답이 없습니다(타임아웃). 확인: ① 백엔드(location 폴더에서 gradlew bootRun) 실행 중인지 ② PC와 휴대폰이 같은 Wi‑Fi인지 ③ PC 방화벽에서 8080 포트 허용인지 ④ .env의 EXPO_PUBLIC_API_BASE_URL이 PC 실제 IP인지(현재: ' +
-              base +
-              '). 주소 수정 후 앱을 완전히 재시작하세요.'
-          );
+          const isLan = /^http:\/\/192\.168\.|^http:\/\/10\./.test(base);
+          const tip = isLan
+            ? 'start:tunnel 사용 중이면 pnpm run tunnel:api 후 .env에 https 주소 넣고 앱 재시작.'
+            : '백엔드 실행 중인지, .env 주소가 맞는지 확인 후 앱 재시작.';
+          throw new Error(`서버 응답 없음(타임아웃). 주소: ${base}. ${tip}`);
         }
         const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
         const isNetworkFailed =
@@ -68,11 +68,11 @@ export function createMessageApiAdapter(): IMessageApi {
           msg.indexOf('request failed') !== -1;
         if (isNetworkFailed) {
           const base = getApiBaseUrl();
-          throw new Error(
-            '네트워크 연결 실패(Network request failed). ① PC와 휴대폰 같은 Wi‑Fi인지 ② .env의 EXPO_PUBLIC_API_BASE_URL이 PC IP인지(현재: ' +
-              base +
-              ') ③ app.config.js 수정 후 개발 빌드 다시 실행(npx expo run:android 또는 run:ios). 연결 주소 수정만 했으면 앱 완전 재시작.'
-          );
+          const isLan = /^http:\/\/192\.168\.|^http:\/\/10\./.test(base);
+          const tip = isLan
+            ? 'start:tunnel로 앱 띄웠으면 휴대폰이 192.168.x.x에 접속 불가. 다른 터미널에서 pnpm run tunnel:api 실행 후 나온 https 주소를 .env의 EXPO_PUBLIC_API_BASE_URL에 넣고 앱 재시작.'
+            : '백엔드(location 폴더 gradlew bootRun) 실행 중인지, .env 주소가 맞는지 확인.';
+          throw new Error(`위치 전송 실패. 주소: ${base}. ${tip}`);
         }
         throw new Error('서버에 연결할 수 없습니다. ' + (e instanceof Error ? e.message : String(e)));
       }

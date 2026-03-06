@@ -5,6 +5,11 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start --port 9080",
+    "start:tunnel": "expo start --tunnel --port 9080",
+    "run:android": "expo run:android",
+    "run:ios": "expo run:ios",
+    "firewall:allow": "node scripts/run-allow-firewall.js",
+    "tunnel:api": "npx ngrok http 8080",
     "android": "expo start --android --port 9080",
     "start:android": "adb reverse tcp:9080 tcp:9080 & expo start --android --port 9080",
     "adb-reverse": "adb reverse tcp:9080 tcp:9080",

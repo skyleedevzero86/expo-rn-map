@@ -2,13 +2,13 @@ import { createStartLocationTracking } from '../use-cases/StartLocationTracking'
 import { createStopLocationTracking } from '../use-cases/StopLocationTracking';
 import { ExpoLocationService } from '@infrastructure/location/ExpoLocationService';
 import { createMessageApiAdapter } from '@infrastructure/http/MessageApiAdapter';
-import { ExpoNotificationService } from '@infrastructure/notifications/ExpoNotificationService';
+import { NoopNotificationService } from '@infrastructure/notifications/NoopNotificationService';
 
 const messageApi = createMessageApiAdapter();
 const startTracking = createStartLocationTracking(
   ExpoLocationService,
   messageApi,
-  ExpoNotificationService
+  NoopNotificationService
 );
 const stopTracking = createStopLocationTracking(ExpoLocationService);
 

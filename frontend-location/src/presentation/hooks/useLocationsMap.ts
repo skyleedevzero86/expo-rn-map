@@ -184,7 +184,12 @@ export function useLocationsMap(
       locationsLoadError.value = '지도 스크립트를 불러올 수 없습니다. .env에 키 설정 후 개발 서버를 재시작하세요.'
       return
     }
+    const REFRESH_INTERVAL_MS = 20_000
+    const isBackendDown = () =>
+      locationsLoadError.value != null &&
+      (locationsLoadError.value.includes('백엔드') || locationsLoadError.value.includes('Backend not running'))
     const runLoad = () => {
+      if (isBackendDown()) return
       loadLocationsAndDrawMap()
       if (location.value) fetchLocation()
     }
@@ -193,7 +198,6 @@ export function useLocationsMap(
     } else {
       runLoad()
     }
-    const REFRESH_INTERVAL_MS = 20_000
     const timer = setInterval(runLoad, REFRESH_INTERVAL_MS)
     onUnmounted(() => clearInterval(timer))
   })

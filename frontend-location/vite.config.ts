@@ -35,6 +35,19 @@ export default defineConfig(({ mode }) => {
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+        configure: (proxy) => {
+          let logged = false
+          proxy.on('error', (err, _req, res) => {
+            if (!logged) {
+              logged = true
+              console.warn('[vite] Backend unreachable (localhost:8080). Start with: cd location && gradlew.bat bootRun')
+            }
+            if (res && !res.headersSent) {
+              res.writeHead(503, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ details: 'Backend not running' }))
+            }
+          })
+        },
       },
     },
   },
