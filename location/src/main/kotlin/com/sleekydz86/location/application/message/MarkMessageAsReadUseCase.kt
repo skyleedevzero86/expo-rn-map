@@ -7,6 +7,5 @@ import org.springframework.stereotype.Service
 class MarkMessageAsReadUseCase(
     private val messageRepository: MessageRepositoryPort
 ) {
-    
     fun execute(messageNo: Long): Boolean = messageRepository.markAsRead(messageNo)
 }

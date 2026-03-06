@@ -113,5 +113,18 @@ export function createMessageApiAdapter(): IMessageApi {
       );
       return createMessages({ message: messages });
     },
+
+    async markMessageAsRead(no: number): Promise<void> {
+      const baseUrl = getApiBaseUrl();
+      const url = `${baseUrl}/api/messages/read/${no}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'X-Source': 'mobile' },
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => '');
+        throw new Error(t || `읽음 처리 실패 ${res.status}`);
+      }
+    },
   };
 }

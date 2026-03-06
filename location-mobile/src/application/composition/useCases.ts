@@ -14,3 +14,4 @@ const stopTracking = createStopLocationTracking(ExpoLocationService);
 
 export const startLocationTracking = startTracking;
 export const stopLocationTracking = stopTracking;
+export const getMessageApi = (): ReturnType<typeof createMessageApiAdapter> => messageApi;

@@ -31,9 +31,11 @@ export function createStartLocationTracking(
     } catch {
     }
 
+    let uploadedOnce = false;
     try {
       await locationService.startWatching(async (coords) => {
-       
+        if (uploadedOnce) return;
+        uploadedOnce = true;
         let messages;
         try {
           messages = await messageApi.uploadLocationAndGetMessages(coords);
